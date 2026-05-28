@@ -613,7 +613,7 @@ select.form-control option { background: var(--card); }
 // ============================================================
 //  CONSTANTS & UTILS
 // ============================================================
-const ASSETS = ['BTC','ETH','SOL','BNB','ADA','DOT','MATIC','AVAX','LINK','XRP'];
+const ASSETS = ['BTC','ETH','SOL','BNB','ADA','DOT','MATIC','AVAX','LINK','XRP','USDT','USDC','DAI'];
 const LS_KEY = 'crypto_manager_data';
 const ISENCAO = 35000;
 const TAX_BRACKETS = [
@@ -641,7 +641,6 @@ function fmtDate(d) {
   return dt.toLocaleDateString('pt-BR');
 }
 function parseDate(str) {
-  // handles yyyy-mm-dd
   return new Date(str + 'T00:00:00');
 }
 function toISO(d) {
@@ -664,8 +663,7 @@ function el(id) { return document.getElementById(id); }
 function ce(tag, cls, html) { const e = document.createElement(tag); if(cls) e.className = cls; if(html) e.innerHTML = html; return e; }
 function escapeHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function lastBusinessDay(year, month) {
-  // last business day of month (Mon-Fri)
-  let d = new Date(year, month, 0); // last day
+  let d = new Date(year, month, 0);
   while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate()-1);
   return d;
 }
@@ -687,6 +685,9 @@ function loadDB() {
     const raw = localStorage.getItem(LS_KEY);
     if (raw) DB = JSON.parse(raw);
   } catch(e) {}
+  if (!DB.settings) DB.settings = { costMethod:'FIFO', userName:'', cpf:'' };
+  if (!DB.prices) DB.prices = {};
+  if (!DB.darfs) DB.darfs = [];
 }
 function saveDB() {
   localStorage.setItem(LS_KEY, JSON.stringify(DB));
@@ -701,8 +702,8 @@ function loadSampleData() {
     { id:'exc-2', nome:'Mercado Bitcoin', tipo:'Nacional', pais:'Brasil', site:'https://mercadobitcoin.com.br', notas:'' },
     { id:'exc-3', nome:'Kraken', tipo:'Estrangeira', pais:'EUA', site:'https://kraken.com', notas:'' }
   ];
-  DB.prices = { BTC: 640000, ETH: 26500, SOL: 820, BNB: 3200 };
-  DB.settings = { costMethod:'FIFO', userName:'Paulo Marques', cpf:'' };
+  DB.prices = { BTC: 640000, ETH: 26500, SOL: 820, BNB: 3200, ADA: 2.5, DOT: 45, MATIC: 3.2 };
+  DB.settings = { costMethod:'FIFO', userName:'Paulo Marques', cpf:'123.456.789-00' };
   DB.operations = [];
   DB.lots = [];
   DB.lotConsumptions = [];
@@ -747,14 +748,61 @@ function getNextLotNumber(asset) {
   return `${asset}-${String(next).padStart(3,'0')}`;
 }
 
-// ============================================================
-//  CORE ENGINE: consumeLots + processOperation (single definitions)
-// ============================================================
+function checkSufficientBalance(asset, qtyToSell, date) {
+  const totalQtyAvailable = DB.lots
+    .filter(l => l.asset === asset && l.qtyRemaining > 0.00000001)
+    .reduce((sum, l) => sum + l.qtyRemaining, 0);
+  return totalQtyAvailable >= (qtyToSell - 0.00000001);
+}
 
+// ============================================================
+//  CORE ENGINE: consumeLots - CORRIGIDO com suporte a Custo Médio
+// ============================================================
 function consumeLots(asset, qty, date, salePrice=0) {
   const method = DB.settings.costMethod || 'FIFO';
-  let openLots = DB.lots.filter(l => l.asset === asset && l.qtyRemaining > 0);
+  let openLots = DB.lots.filter(l => l.asset === asset && l.qtyRemaining > 0.00000001);
 
+  if (openLots.length === 0) {
+    return { consumptions: [], gainLoss: 0, costBasis: 0, totalCost: 0 };
+  }
+
+  // Para Custo Médio, precisamos calcular o custo médio ponderado de TODOS os lotes abertos
+  if (method === 'Custo Médio') {
+    const totalQty = openLots.reduce((sum, l) => sum + l.qtyRemaining, 0);
+    const totalCostSum = openLots.reduce((sum, l) => sum + (l.qtyRemaining * l.costBasis), 0);
+    const avgCost = totalQty > 0 ? totalCostSum / totalQty : 0;
+    
+    const totalCost = qty * avgCost;
+    const saleRevenue = qty * salePrice;
+    const gainLoss = saleRevenue - totalCost;
+    
+    // Criar consumi��es proporcionais de cada lote
+    const consumptions = [];
+    let remainingQty = qty;
+    
+    for (const lot of openLots) {
+      if (remainingQty <= 0.00000001) break;
+      const take = Math.min(lot.qtyRemaining, remainingQty);
+      const takeCost = take * avgCost;
+      
+      remainingQty -= take;
+      lot.qtyRemaining = parseFloat((lot.qtyRemaining - take).toFixed(8));
+      lot.status = lot.qtyRemaining <= 0.00000001 ? 'Encerrado' : (lot.qtyRemaining < lot.qtyOriginal ? 'Parcial' : 'Aberto');
+      
+      consumptions.push({
+        id: uid(),
+        lotId: lot.lotId,
+        asset,
+        qtyConsumed: take,
+        costBasis: avgCost,
+        totalCost: takeCost
+      });
+    }
+    
+    return { consumptions, gainLoss, costBasis: avgCost, totalCost };
+  }
+  
+  // FIFO ou LIFO
   if (method === 'FIFO') {
     openLots.sort((a,b) => a.dateBuy.localeCompare(b.dateBuy));
   } else if (method === 'LIFO') {
@@ -768,12 +816,12 @@ function consumeLots(asset, qty, date, salePrice=0) {
   const consumptions = [];
 
   for (const lot of openLots) {
-    if (remaining <= 0) break;
+    if (remaining <= 0.00000001) break;
     const take = Math.min(lot.qtyRemaining, remaining);
     totalCost += take * lot.costBasis;
     remaining -= take;
     lot.qtyRemaining = parseFloat((lot.qtyRemaining - take).toFixed(8));
-    lot.status = lot.qtyRemaining <= 0.000000001 ? 'Encerrado' : (lot.qtyRemaining < lot.qtyOriginal ? 'Parcial' : 'Aberto');
+    lot.status = lot.qtyRemaining <= 0.00000001 ? 'Encerrado' : (lot.qtyRemaining < lot.qtyOriginal ? 'Parcial' : 'Aberto');
     consumptions.push({ id: uid(), lotId: lot.lotId, asset, qtyConsumed: take, costBasis: lot.costBasis, totalCost: take*lot.costBasis });
   }
 
@@ -805,6 +853,12 @@ function processOperation(op) {
     });
 
   } else if (op.type === 'VENDA') {
+    // VALIDAÇÃO DE SALDO SUFICIENTE
+    if (!checkSufficientBalance(op.asset, op.qty, op.date)) {
+      showToast(`Saldo insuficiente de ${op.asset} para venda.`, 'error');
+      return false;
+    }
+    
     const totalBRL = op.qty * op.price;
     const { consumptions, gainLoss, costBasis } = consumeLots(op.asset, op.qty, op.date, op.price);
     const netGain = gainLoss - (op.fees||0);
@@ -820,6 +874,12 @@ function processOperation(op) {
     }
 
   } else if (op.type === 'PERMUTA') {
+    // VALIDAÇÃO DE SALDO SUFICIENTE para o ativo de saída
+    if (!checkSufficientBalance(op.assetFrom, op.qtyFrom, op.date)) {
+      showToast(`Saldo insuficiente de ${op.assetFrom} para permuta.`, 'error');
+      return false;
+    }
+    
     const sellPrice = op.refBRL / op.qtyFrom;
     const { consumptions, gainLoss } = consumeLots(op.assetFrom, op.qtyFrom, op.date, sellPrice);
     const netGain = gainLoss - (op.fees||0);
@@ -845,11 +905,21 @@ function processOperation(op) {
       DB.lotConsumptions.push({ ...c, operationId: opId, saleDate: op.date, salePrice: sellPrice });
     }
   }
+  saveDB();
+  return true;
 }
 
 // ============================================================
-//  TAX ENGINE
+//  TAX ENGINE - CORRIGIDO com tabela progressiva correta
 // ============================================================
+function calcProgressiveTax(base) {
+  // Tabela correta para ganhos de capital (Lei 13.259/16)
+  if (base <= 5000000) return base * 0.15;
+  if (base <= 10000000) return 5000000 * 0.15 + (base - 5000000) * 0.175;
+  if (base <= 30000000) return 5000000 * 0.15 + 5000000 * 0.175 + (base - 10000000) * 0.20;
+  return 5000000 * 0.15 + 5000000 * 0.175 + 20000000 * 0.20 + (base - 30000000) * 0.225;
+}
+
 function calcTaxes() {
   const salesOps = DB.operations.filter(o => o.type === 'VENDA' || o.type === 'PERMUTA');
   const byMonth = {};
@@ -872,15 +942,14 @@ function calcTaxes() {
   for (const mk of months) {
     const m = byMonth[mk];
     const isExempt = m.totalSales <= ISENCAO;
-    const netGain = m.totalGains - m.totalLosses;
+    let netGain = m.totalGains - m.totalLosses;
     let taxBase = 0, tax = 0, lossCompensated = 0, aliquota = 0;
 
     if (!isExempt && netGain > 0) {
-      const beforeComp = netGain;
       lossCompensated = Math.min(accumulatedLoss, netGain);
       taxBase = netGain - lossCompensated;
       accumulatedLoss -= lossCompensated;
-      if (taxBase > 0) {
+      if (taxBase > 0.01) {
         tax = calcProgressiveTax(taxBase);
         aliquota = tax / taxBase;
       }
@@ -913,30 +982,20 @@ function calcTaxes() {
   return result;
 }
 
-function calcProgressiveTax(base) {
-  let tax = 0, prev = 0;
-  for (const bracket of TAX_BRACKETS) {
-    const taxable = Math.min(base, bracket.limit) - prev;
-    if (taxable <= 0) break;
-    tax += taxable * bracket.rate;
-    prev = bracket.limit;
-    if (base <= bracket.limit) break;
-  }
-  return tax;
-}
-
 function getTaxSummary() {
   const taxes = calcTaxes();
   const current = new Date();
   const currentMk = `${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}`;
   const thisMonth = taxes.find(t => t.monthKey === currentMk);
-  const unpaid = taxes.filter(t => t.darfStatus === 'Pendente' && t.tax > 0);
-  const accLoss = taxes.reduce((acc, t) => {
-    if (!t.isExempt && t.netGain < 0) return acc + Math.abs(t.netGain);
-    if (!t.isExempt && t.netGain > 0) return Math.max(0, acc - t.lossCompensated);
-    return acc;
-  }, 0);
-  return { thisMonth, unpaid, taxes, accLoss };
+  const unpaid = taxes.filter(t => t.darfStatus === 'Pendente' && t.tax > 0.01);
+  
+  let accumulatedLoss = 0;
+  for (const t of taxes) {
+    if (!t.isExempt && t.netGain < 0) accumulatedLoss += Math.abs(t.netGain);
+    else if (!t.isExempt && t.netGain > 0) accumulatedLoss = Math.max(0, accumulatedLoss - t.lossCompensated);
+  }
+  
+  return { thisMonth, unpaid, taxes, accLoss: accumulatedLoss };
 }
 
 // ============================================================
@@ -945,7 +1004,7 @@ function getTaxSummary() {
 function getPortfolio() {
   const assets = {};
   for (const lot of DB.lots) {
-    if (lot.qtyRemaining <= 0.000000001) continue;
+    if (lot.qtyRemaining <= 0.00000001) continue;
     if (!assets[lot.asset]) assets[lot.asset] = { qty: 0, totalCost: 0, lots: [] };
     assets[lot.asset].qty += lot.qtyRemaining;
     assets[lot.asset].totalCost += lot.qtyRemaining * lot.costBasis;
@@ -1006,7 +1065,6 @@ const chartInstances = {};
 
 function navigate(page) {
   currentPage = page;
-  // destroy old charts
   Object.values(chartInstances).forEach(c => { try { c.destroy(); } catch(e){} });
   Object.keys(chartInstances).forEach(k => delete chartInstances[k]);
 
@@ -1021,7 +1079,7 @@ document.querySelectorAll('.nav-item').forEach(n => {
 });
 
 // ============================================================
-//  PAGE: DASHBOARD
+//  PAGE: DASHBOARD - CORRIGIDO gráfico de evolução patrimonial
 // ============================================================
 function renderDashboard() {
   const portfolio = getPortfolio();
@@ -1034,17 +1092,7 @@ function renderDashboard() {
   const estimatedTax = taxSummary.thisMonth ? taxSummary.thisMonth.tax : 0;
   const totalOps = DB.operations.length;
   const numAssets = portfolio.assets.length;
-
-  // Accumulated loss calculation
-  let accLoss = 0;
-  const taxes = calcTaxes();
-  let runningLoss = 0;
-  for (const t of taxes) {
-    if (!t.isExempt && t.netGain < 0) runningLoss += Math.abs(t.netGain);
-    else if (!t.isExempt && t.netGain > 0) runningLoss = Math.max(0, runningLoss - t.lossCompensated);
-  }
-  accLoss = runningLoss;
-
+  const accLoss = taxSummary.accLoss;
   const unpaidDarfs = taxSummary.unpaid;
 
   let html = `
@@ -1134,32 +1182,52 @@ function renderDashboard() {
 
   el('content-area').innerHTML = html;
 
-  // Chart: Patrimônio evolution (simulate from operations)
+  // GRÁFICO DE EVOLUÇÃO PATRIMONIAL CORRIGIDO
   const now = new Date();
   const labels = [], values = [];
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     labels.push(monthLabel(mk));
-    // sum investments up to this month
+    
+    // Calcular patrimônio líquido (investido - realizado) até esta data
     const endDate = toISO(new Date(d.getFullYear(), d.getMonth()+1, 0));
-    let val = 0;
-    for (const lot of DB.lots) {
-      if (lot.dateBuy <= endDate) {
-        const rem = Math.max(0, lot.qtyRemaining);
-        const price = DB.prices[lot.asset] || lot.costBasis;
-        val += lot.qtyOriginal * price;
+    
+    let invested = 0, withdrawn = 0;
+    
+    for (const op of DB.operations) {
+      if (op.date <= endDate) {
+        if (op.type === 'COMPRA') {
+          invested += op.totalBRL + (op.fees || 0);
+        } else if (op.type === 'VENDA') {
+          withdrawn += op.totalBRL - (op.fees || 0);
+        } else if (op.type === 'PERMUTA') {
+          // Na permuta, consideramos o valor de referência como saída
+          withdrawn += op.refBRL - (op.fees || 0);
+        }
       }
     }
-    values.push(val > 0 ? val : null);
+    
+    // Valor atual estimado dos ativos restantes no final do período
+    let remainingValue = 0;
+    for (const lot of DB.lots) {
+      if (lot.dateBuy <= endDate) {
+        const priceAtDate = DB.prices[lot.asset] || lot.costBasis;
+        // Estimar consumo até esta data
+        let consumed = 0;
+        for (const c of DB.lotConsumptions) {
+          if (c.lotId === lot.lotId && c.saleDate <= endDate) {
+            consumed += c.qtyConsumed;
+          }
+        }
+        const remaining = Math.max(0, lot.qtyOriginal - consumed);
+        remainingValue += remaining * priceAtDate;
+      }
+    }
+    
+    values.push(invested - withdrawn);
   }
-  // Fill nulls with previous value
-  let last = 0;
-  for (let i = 0; i < values.length; i++) {
-    if (values[i] === null) values[i] = last;
-    else last = values[i];
-  }
-
+  
   const ctxP = el('chart-patrimonio');
   if (ctxP) {
     chartInstances['patrimonio'] = new Chart(ctxP, {
@@ -1172,7 +1240,6 @@ function renderDashboard() {
     });
   }
 
-  // Chart: Donut distribution
   const ctxD = el('chart-dist');
   if (ctxD && portfolio.assets.length) {
     const palette = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#10b981'];
@@ -1221,7 +1288,6 @@ function renderNovaOp(opToEdit) {
       </div>
     </div>
 
-    <!-- Permuta fields -->
     <div id="permuta-fields" style="display:none">
       <div class="form-row form-row-3">
         <div class="form-group">
@@ -1256,7 +1322,6 @@ function renderNovaOp(opToEdit) {
       </div>
     </div>
 
-    <!-- Normal buy/sell fields -->
     <div id="normal-fields">
       <div class="form-row form-row-4">
         <div class="form-group">
@@ -1304,7 +1369,6 @@ function renderNovaOp(opToEdit) {
 
   el('content-area').innerHTML = html;
   onOpTypeChange();
-  if (op.type) el('op-type').value = op.type;
   if (op.qty && op.price) calcTotal();
 }
 
@@ -1366,8 +1430,8 @@ function saveOperation(editId) {
     if (!assetFrom || !assetTo || !qtyFrom || !qtyTo || !refBRL || !date) {
       showToast('Preencha todos os campos obrigatórios', 'error'); return;
     }
-    processOperation({ type:'PERMUTA', assetFrom, assetTo, qtyFrom, qtyTo, refBRL, date, exchangeId, fees, obs });
-    saveDB(); showToast('Permuta registrada com sucesso!', 'success'); renderNovaOp();
+    const success = processOperation({ type:'PERMUTA', assetFrom, assetTo, qtyFrom, qtyTo, refBRL, date, exchangeId, fees, obs });
+    if (success !== false) { saveDB(); showToast('Permuta registrada com sucesso!', 'success'); renderNovaOp(); }
     return;
   }
 
@@ -1386,13 +1450,12 @@ function saveOperation(editId) {
     showToast('Quantidade e preço devem ser maiores que zero', 'error'); return;
   }
 
-  processOperation({ type, asset, qty, price, fees, date, exchangeId, obs });
-  saveDB(); showToast(`${type === 'COMPRA' ? 'Compra' : 'Venda'} registrada com sucesso!`, 'success');
-  renderNovaOp();
+  const success = processOperation({ type, asset, qty, price, fees, date, exchangeId, obs });
+  if (success !== false) { saveDB(); showToast(`${type === 'COMPRA' ? 'Compra' : 'Venda'} registrada com sucesso!`, 'success'); renderNovaOp(); }
 }
 
 // ============================================================
-//  PAGE: LOTES
+//  PAGE: LOTES (com suporte a alteração do método de custeio)
 // ============================================================
 let lotesView = 'lotes';
 let lotFilters = { asset:'', status:'', exchangeId:'', from:'', to:'' };
@@ -1445,6 +1508,12 @@ function clearLotFilters() {
   renderLotesContent();
 }
 
+function onChangeCostMethod(value) {
+  DB.settings.costMethod = value;
+  saveDB();
+  renderLotesContent();
+}
+
 function renderLotesContent() {
   let lots = DB.lots.filter(l => {
     if (lotFilters.asset && l.asset !== lotFilters.asset) return false;
@@ -1456,7 +1525,7 @@ function renderLotesContent() {
   });
 
   if (lotesView === 'lotes') {
-    let html = `<div class="table-card"><div class="table-header"><h3>📦 ${lots.length} lote(s)</h3></div><div class="table-wrap"><table>
+    let html = `<div class="table-card"><div class="table-header"><h3>📦 ${lots.length} lote(s)</h3></div><div class="table-wrap"></table>
       <thead><tr>
         <th>Lote</th><th>Ativo</th><th>Data Compra</th><th>Qtd Original</th>
         <th>Qtd Restante</th><th>Custo Médio Aq.</th><th>Custo Total</th><th>Status</th><th>Ações</th>
@@ -1500,7 +1569,6 @@ function renderLotesContent() {
     el('lotes-content').innerHTML = html;
 
   } else {
-    // By asset
     const byAsset = {};
     for (const lot of lots) {
       if (!byAsset[lot.asset]) byAsset[lot.asset] = { lots:[], openLots:0, totalQty:0, totalCost:0 };
@@ -1513,7 +1581,7 @@ function renderLotesContent() {
     }
     let html = `<div class="table-card"><div class="table-header"><h3>📊 Por Ativo</h3>
       <div class="actions"><label style="font-size:12px;color:var(--text2)">Custeio:</label>
-        <select class="form-control" style="width:140px" onchange="DB.settings.costMethod=this.value;saveDB();renderLotesContent()">
+        <select class="form-control" style="width:140px" onchange="onChangeCostMethod(this.value)">
           <option value="FIFO" ${DB.settings.costMethod==='FIFO'?'selected':''}>FIFO</option>
           <option value="LIFO" ${DB.settings.costMethod==='LIFO'?'selected':''}>LIFO</option>
           <option value="Custo Médio" ${DB.settings.costMethod==='Custo Médio'?'selected':''}>Custo Médio</option>
@@ -1606,11 +1674,10 @@ function renderCarteira() {
           </div>
           ${a.portfolioPct.toFixed(1)}%
         </div>
-      </td>
+       </td>
     </tr>`;
   }
 
-  // Totals
   const totalCost = portfolio.assets.reduce((s,a)=>s+a.totalCost,0);
   const totalVal = portfolio.totalCurrentValue;
   const totalPL = portfolio.assets.reduce((s,a)=>s+a.pl,0);
@@ -1660,7 +1727,6 @@ function openPriceModal() {
       <input type="number" class="form-control" id="price-${a.asset}" value="${a.currentPrice}" style="width:160px" step="0.01">
     </div>`;
   }
-  // Add any asset in prices not in portfolio
   for (const [asset, price] of Object.entries(DB.prices)) {
     if (!portfolio.assets.find(a=>a.asset===asset)) {
       html += `<div class="price-input-row">
@@ -1737,7 +1803,7 @@ function renderPnlContent() {
         <td>${fmtBRL(op.fees)}</td>
         <td class="${colorPL(grossGain)}">${fmtBRL(grossGain)}</td>
         <td class="${colorPL(op.gainLoss)}">${fmtBRL(op.gainLoss)}</td>
-      </tr>`;
+      </table>`;
     }
     html += `<tr class="totals-row">
       <td colspan="4">TOTAL</td>
@@ -1750,11 +1816,9 @@ function renderPnlContent() {
     if (!ops.length) html += `<tr><td colspan="9" class="empty-state">Nenhuma venda registrada</td></tr>`;
     html += `</tbody></table></div></div>`;
 
-    // Monthly P&L chart
     html += `<div class="chart-card"><div class="chart-title">📊 P&L Realizado por Mês</div><canvas id="chart-pnl-monthly" height="120"></canvas></div>`;
     el('pnl-content').innerHTML = html;
 
-    // Build monthly data
     const monthlyPL = {};
     for (const op of ops) {
       const mk = monthKey(op.date);
@@ -1802,7 +1866,6 @@ function renderPnlContent() {
     el('pnl-content').innerHTML = html;
 
   } else {
-    // Por ativo
     const portfolio = getPortfolio();
     const realizedByAsset = {};
     DB.operations.filter(o => (o.type==='VENDA'||o.type==='PERMUTA') && o.gainLoss!==null).forEach(o => {
@@ -1831,13 +1894,13 @@ function renderPnlContent() {
       </tr>`;
     }
     if (!allAssets.length) html += `<tr><td colspan="4" class="empty-state">Sem dados</td></tr>`;
-    html += `</tbody></table></div></div>`;
+    html += `</tbody></tr></div></div>`;
     el('pnl-content').innerHTML = html;
   }
 }
 
 // ============================================================
-//  PAGE: IMPOSTOS
+//  PAGE: IMPOSTOS (completa)
 // ============================================================
 let impostosTab = 'apuracao';
 
@@ -1944,7 +2007,7 @@ function renderImpostosContent() {
     let runLoss = 0;
     let html = `<div class="table-card">
       <div class="table-header"><h3>Histórico de Prejuízo Acumulado</h3></div>
-      <div class="table-wrap"><table>
+      <div class="table-wrap"></table>
         <thead><tr>
           <th>Mês</th><th>Ganho Líquido do Mês</th><th>Prejuízo Compensado</th><th>Variação</th><th>Acumulado</th>
         </tr></thead><tbody>`;
@@ -1963,7 +2026,7 @@ function renderImpostosContent() {
     html += `</tbody></table></div></div>`;
     el('impostos-content').innerHTML = html;
 
-  } else { // gcap
+  } else {
     const gcapText = generateGCAPText(taxes);
     let html = `
     <div class="info-box">
@@ -2109,7 +2172,6 @@ function renderExtratoTable() {
     return true;
   });
 
-  // Sort
   ops = ops.sort((a,b) => {
     let va = a[extratoSort.col], vb = b[extratoSort.col];
     if (typeof va === 'string') va = va.toLowerCase(), vb = (vb||'').toLowerCase();
@@ -2122,7 +2184,7 @@ function renderExtratoTable() {
 
   let html = `<div class="table-card">
     <div class="table-header"><h3>📋 ${ops.length} operações</h3></div>
-    <div class="table-wrap"><table>
+    <div class="table-wrap"></table>
       <thead><tr>`;
   for (let i=0; i<cols.length; i++) {
     const isSort = extratoSort.col === cols[i];
@@ -2185,7 +2247,7 @@ function renderMensal() {
         }).join('')}
       </select>
       <select class="form-control" id="mensal-year" onchange="renderMensalContent()">
-        ${[2024,2025,2026].map(y=>`<option value="${y}" ${now.getFullYear()===y?'selected':''}>${y}</option>`).join('')}
+        ${[2023,2024,2025,2026].map(y=>`<option value="${y}" ${now.getFullYear()===y?'selected':''}>${y}</option>`).join('')}
       </select>
       <button class="btn btn-ghost no-print" onclick="window.print()">🖨️ Imprimir</button>
     </div>
@@ -2212,18 +2274,6 @@ function renderMensalContent() {
   const taxesAll = calcTaxes();
   const taxMonth = taxesAll.find(t => t.monthKey === mk);
 
-  // Previous month comparison
-  const [ym, mm] = mk.split('-').map(Number);
-  let prevM = mm - 1, prevY = ym;
-  if (prevM < 1) { prevM = 12; prevY--; }
-  const prevMk = `${prevY}-${String(prevM).padStart(2,'0')}`;
-  const prevOps = DB.operations.filter(o => monthKey(o.date) === prevMk);
-  const prevVolume = prevOps.reduce((s,o)=>s+o.totalBRL,0);
-  const prevGain = prevOps.filter(o=>o.type!=='COMPRA').reduce((s,o)=>s+(o.gainLoss||0),0);
-
-  const volChg = prevVolume > 0 ? ((totalVolume-prevVolume)/prevVolume)*100 : null;
-  const gainChg = prevGain !== 0 ? ((totalGain-prevGain)/Math.abs(prevGain))*100 : null;
-
   let html = `
   <div class="cards-row cards-4">
     <div class="card"><div class="card-label">Operações</div><div class="card-value">${ops.length}</div></div>
@@ -2232,18 +2282,6 @@ function renderMensalContent() {
     <div class="card"><div class="card-label">Imposto DARF</div><div class="card-value ${taxMonth && taxMonth.tax > 0 ? 'negative':'neutral'}">${taxMonth ? fmtBRL(taxMonth.tax) : fmtBRL(0)}</div></div>
   </div>`;
 
-  // Compare with previous
-  if (prevOps.length > 0) {
-    html += `<div class="card" style="margin-bottom:16px">
-      <div class="card-label">📊 Comparativo com ${monthLabel(prevMk)}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px">
-        <div>Volume: <span class="${volChg!==null?(volChg>=0?'positive':'negative'):'neutral'}">${volChg!==null?fmtPct(volChg):'N/A'}</span></div>
-        <div>Ganho: <span class="${gainChg!==null?(gainChg>=0?'positive':'negative'):'neutral'}">${gainChg!==null?fmtPct(gainChg):'N/A'}</span></div>
-      </div>
-    </div>`;
-  }
-
-  // Tax situation
   if (taxMonth) {
     html += `<div class="alert-box ${taxMonth.isExempt?'':'danger'}" style="margin-bottom:16px">
       <h4>Situação Fiscal — ${label}</h4>
@@ -2252,10 +2290,9 @@ function renderMensalContent() {
     </div>`;
   }
 
-  // Operations table
   html += `<div class="table-card">
     <div class="table-header"><h3>Operações de ${label}</h3></div>
-    <div class="table-wrap"><table>
+    <div class="table-wrap"><td>
       <thead><tr><th>Data</th><th>Tipo</th><th>Ativo</th><th>Qtd</th><th>Preço</th><th>Total BRL</th><th>G/P</th><th>Exchange</th></tr></thead>
       <tbody>`;
   for (const op of ops.sort((a,b)=>a.date.localeCompare(b.date))) {
@@ -2274,7 +2311,6 @@ function renderMensalContent() {
   if (!ops.length) html += `<tr><td colspan="8" class="empty-state">Nenhuma operação em ${label}</td></tr>`;
   html += `</tbody></table></div></div>`;
 
-  // New lots
   if (newLots.length) {
     html += `<div class="table-card">
       <div class="table-header"><h3>Novos Lotes Criados (${newLots.length})</h3></div>
@@ -2340,10 +2376,8 @@ function renderAnualContent() {
     <div class="card"><div class="card-label">Imposto Due / Pago</div><div class="card-value">${fmtBRL(totalTax)} / <span class="positive">${fmtBRL(totalPaid)}</span></div></div>
   </div>`;
 
-  // Monthly P&L chart
   html += `<div class="chart-card"><div class="chart-title">P&L Realizado por Mês — ${year}</div><canvas id="chart-anual-monthly" height="120"></canvas></div>`;
 
-  // P&L by asset
   const byAsset = {};
   for (const op of yearSales) {
     if (!byAsset[op.asset]) byAsset[op.asset] = 0;
@@ -2352,7 +2386,7 @@ function renderAnualContent() {
 
   html += `<div class="table-card">
     <div class="table-header"><h3>P&L por Ativo — ${year}</h3></div>
-    <div class="table-wrap"><table>
+    <div class="table-wrap"></table>
       <thead><tr><th>Ativo</th><th>Operações</th><th>Total Alienado</th><th>P&L Realizado</th></tr></thead><tbody>`;
   for (const [asset, pl] of Object.entries(byAsset)) {
     const opsAsset = yearSales.filter(o=>o.asset===asset);
@@ -2367,12 +2401,11 @@ function renderAnualContent() {
   if (!Object.keys(byAsset).length) html += `<tr><td colspan="4" class="empty-state">Sem vendas em ${year}</td></tr>`;
   html += `</tbody></table></div></div>`;
 
-  // IRPF — Bens e Direitos
   html += `<div class="section-divider">IRPF — Bens e Direitos (Ficha de Bens)</div>`;
   html += `<div class="info-box">Código 89 — Criptoativos. Informe pelo custo de aquisição (não pelo valor de mercado).</div>`;
   html += `<div class="table-card">
     <div class="table-header"><h3>Bens e Direitos — Criptoativos</h3></div>
-    <div class="table-wrap"><table>
+    <div class="table-wrap"></table>
       <thead><tr>
         <th>Código</th><th>Ativo</th><th>Quantidade (${year-1}/12/31)</th><th>Custo (${year-1}/12/31)</th>
         <th>Quantidade (${year}/12/31)</th><th>Custo (${year}/12/31)</th>
@@ -2396,12 +2429,11 @@ function renderAnualContent() {
   }
   html += `</tbody></table></div></div>`;
 
-  // IRPF — Rendimentos tributados
   if (yearTaxes.some(t => !t.isExempt && t.tax > 0)) {
     html += `<div class="section-divider">IRPF — Rendimentos Tributados Exclusivamente na Fonte / Definitivo</div>`;
     html += `<div class="table-card">
       <div class="table-header"><h3>Apuração GCAP ${year}</h3></div>
-      <div class="table-wrap"><table>
+      <div class="table-wrap"></table>
         <thead><tr><th>Mês</th><th>Base Cálculo</th><th>Alíquota</th><th>Imposto</th><th>DARF Status</th></tr></thead><tbody>`;
     for (const t of yearTaxes.filter(t=>!t.isExempt&&t.tax>0)) {
       const paid = DB.darfs.find(d=>d.monthKey===t.monthKey&&d.status==='Pago');
@@ -2418,7 +2450,6 @@ function renderAnualContent() {
 
   el('anual-content').innerHTML = html;
 
-  // Monthly chart
   const mLabels = [], mValues = [];
   for (let m = 1; m <= 12; m++) {
     const mk = `${year}-${String(m).padStart(2,'0')}`;
@@ -2438,16 +2469,13 @@ function renderAnualContent() {
 }
 
 function calcPortfolioAtDate(dateStr) {
-  // Simulate portfolio positions at a given date
   const snapshot = {};
-  // Clone lots
   const lotsClone = DB.lots.map(l => ({...l}));
   const consumptionsClone = DB.lotConsumptions.map(c => ({...c}));
 
   for (const lot of lotsClone) {
     if (lot.dateBuy > dateStr) continue;
     if (!snapshot[lot.asset]) snapshot[lot.asset] = { qty:0, totalCost:0 };
-    // How much was consumed up to dateStr
     const consumed = consumptionsClone
       .filter(c => c.lotId===lot.lotId && c.saleDate <= dateStr)
       .reduce((s,c)=>s+c.qtyConsumed,0);
@@ -2478,7 +2506,7 @@ function renderPermutas() {
       <thead><tr>
         <th>Data</th><th>De (Ativo)</th><th>Qtd Saída</th><th>Para (Ativo)</th><th>Qtd Entrada</th>
         <th>Valor BRL Ref.</th><th>Ganho/Perda</th><th>Exchange</th><th>Obs</th>
-      </tr></thead><tbody>`;
+      </table></thead><tbody>`;
 
   for (const op of perms) {
     const exc = getExchange(op.exchangeId);
@@ -2494,7 +2522,7 @@ function renderPermutas() {
       <td style="font-size:11px;color:var(--text2)">${escapeHtml(op.obs||'')}</td>
     </tr>`;
   }
-  if (!perms.length) html += `<tr><td colspan="9" class="empty-state"><div class="empty-icon">🔄</div>Nenhuma permuta registrada</td></tr>`;
+  if (!perms.length) html += `<tr><td colspan="9" class="empty-state"><div class="empty-icon">🔄</div>Nenhuma permuta registrada</td></td>`;
   html += `</tbody></table></div></div>`;
 
   el('content-area').innerHTML = html;
@@ -2650,7 +2678,6 @@ function renderConfiguracoes() {
       <input type="number" class="form-control" id="cfg-price-${asset}" value="${DB.prices[asset]||0}" step="0.01" style="max-width:200px">
     </div>`;
   }
-  // Add new price field
   html += `<div class="price-input-row" style="margin-top:12px">
     <div class="autocomplete-wrap"><input class="form-control" id="cfg-new-asset" placeholder="Novo ativo" style="width:100px" autocomplete="off" oninput="showAC('cfg-new-asset','cfg-new-ac')"><div class="autocomplete-list" id="cfg-new-ac" style="display:none"></div></div>
     <input type="number" class="form-control" id="cfg-new-price" placeholder="Preço BRL" step="0.01" style="max-width:180px;margin-left:8px">
@@ -2732,6 +2759,9 @@ function importJSON(input) {
     try {
       const data = JSON.parse(e.target.result);
       DB = data;
+      if (!DB.settings) DB.settings = { costMethod:'FIFO', userName:'', cpf:'' };
+      if (!DB.prices) DB.prices = {};
+      if (!DB.darfs) DB.darfs = [];
       saveDB();
       showToast('Dados importados com sucesso!', 'success');
       navigate('dashboard');
@@ -2890,7 +2920,6 @@ function exportTaxCsv() { downloadCSV(getTaxRows(), 'Impostos_GCAP.csv'); }
 
 function exportGCAPTxt() {
   const text = generateGCAPText(calcTaxes());
-  downloadText('', '', text);
   downloadFile(text, 'GCAP_Resumo.txt', 'text/plain');
   showToast('GCAP exportado!', 'success');
 }
@@ -2991,7 +3020,7 @@ function copyText(elId) {
 //  BADGE UPDATE
 // ============================================================
 function updateBadges() {
-  const unpaid = calcTaxes().filter(t => t.tax > 0 && !DB.darfs.find(d=>d.monthKey===t.monthKey&&d.status==='Pago'));
+  const unpaid = calcTaxes().filter(t => t.tax > 0.01 && !DB.darfs.find(d=>d.monthKey===t.monthKey&&d.status==='Pago'));
   const badge = document.querySelector('[data-page="impostos"] .nav-badge');
   if (unpaid.length > 0) {
     if (!badge) {
@@ -3010,10 +3039,10 @@ loadDB();
 if (!DB.operations.length && !DB.exchanges.length) {
   loadSampleData();
 } else {
-  // Ensure settings exist
   if (!DB.settings) DB.settings = { costMethod:'FIFO', userName:'', cpf:'' };
   if (!DB.prices) DB.prices = {};
   if (!DB.darfs) DB.darfs = [];
+  saveDB();
 }
 
 updateBadges();
