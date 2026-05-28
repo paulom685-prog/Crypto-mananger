@@ -1,0 +1,3023 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto Manager — Portfólio de Criptoativos</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0e1a;
+  --sidebar: #0d1117;
+  --card: #161b27;
+  --border: #21262d;
+  --accent: #3b82f6;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --text: #f0f6fc;
+  --text2: #8b949e;
+  --card2: #1c2333;
+  --radius: 10px;
+  --sidebar-w: 240px;
+}
+html, body { height: 100%; overflow: hidden; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; }
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+/* ===== SIDEBAR ===== */
+#sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  z-index: 100;
+  transition: width .2s;
+}
+.sidebar-logo {
+  padding: 20px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sidebar-logo .logo-icon { font-size: 28px; }
+.sidebar-logo .logo-text { font-size: 15px; font-weight: 700; color: var(--text); }
+.sidebar-logo .logo-sub { font-size: 10px; color: var(--text2); }
+.nav-section { padding: 8px 0; }
+.nav-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text2);
+  letter-spacing: 1px;
+  padding: 4px 16px 2px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  cursor: pointer;
+  border-radius: 6px;
+  margin: 1px 8px;
+  font-size: 13px;
+  color: var(--text2);
+  transition: background .15s, color .15s;
+  user-select: none;
+}
+.nav-item:hover { background: rgba(59,130,246,.1); color: var(--text); }
+.nav-item.active { background: rgba(59,130,246,.18); color: var(--accent); font-weight: 600; }
+.nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+.nav-item .nav-badge {
+  margin-left: auto;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+/* ===== MAIN ===== */
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.topbar {
+  background: var(--sidebar);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.topbar h1 { font-size: 16px; font-weight: 600; }
+.topbar .topbar-sub { font-size: 12px; color: var(--text2); margin-left: auto; }
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+/* ===== CARDS ===== */
+.cards-row { display: grid; gap: 16px; margin-bottom: 20px; }
+.cards-4 { grid-template-columns: repeat(4, 1fr); }
+.cards-3 { grid-template-columns: repeat(3, 1fr); }
+.cards-2 { grid-template-columns: repeat(2, 1fr); }
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+.card-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+.card-value { font-size: 22px; font-weight: 700; }
+.card-sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
+.card-icon { font-size: 24px; float: right; opacity: .6; }
+.positive { color: var(--success); }
+.negative { color: var(--danger); }
+.neutral { color: var(--text2); }
+.warning-text { color: var(--warning); }
+
+/* ===== CHARTS ===== */
+.charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 20px; }
+.chart-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.chart-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+.chart-wrap { position: relative; }
+
+/* ===== TABLES ===== */
+.table-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.table-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.table-header h3 { font-size: 14px; font-weight: 600; }
+.table-header .actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th {
+  background: rgba(255,255,255,.03);
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text2);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+thead th:hover { color: var(--text); }
+thead th .sort-icon { margin-left: 4px; opacity: .4; }
+thead th.sorted .sort-icon { opacity: 1; color: var(--accent); }
+tbody tr { border-bottom: 1px solid rgba(33,38,45,.6); transition: background .1s; }
+tbody tr:hover { background: rgba(255,255,255,.03); }
+tbody tr:last-child { border-bottom: none; }
+tbody td { padding: 10px 14px; vertical-align: middle; }
+.td-mono { font-family: 'Courier New', monospace; font-size: 12px; }
+.totals-row td { font-weight: 700; border-top: 1px solid var(--border); background: rgba(255,255,255,.03); }
+
+/* ===== BADGES ===== */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge-green { background: rgba(34,197,94,.15); color: var(--success); }
+.badge-yellow { background: rgba(245,158,11,.15); color: var(--warning); }
+.badge-gray { background: rgba(139,148,158,.15); color: var(--text2); }
+.badge-blue { background: rgba(59,130,246,.15); color: var(--accent); }
+.badge-red { background: rgba(239,68,68,.15); color: var(--danger); }
+.badge-buy { background: rgba(34,197,94,.15); color: var(--success); }
+.badge-sell { background: rgba(239,68,68,.15); color: var(--danger); }
+.badge-swap { background: rgba(245,158,11,.15); color: var(--warning); }
+
+/* ===== BUTTONS ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all .15s;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #2563eb; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { background: #16a34a; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: #dc2626; }
+.btn-ghost { background: rgba(255,255,255,.07); color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover { background: rgba(255,255,255,.12); }
+.btn-sm { padding: 4px 10px; font-size: 11px; }
+.btn-icon { padding: 6px; border-radius: 6px; background: transparent; border: 1px solid var(--border); color: var(--text2); cursor: pointer; font-size: 13px; }
+.btn-icon:hover { background: rgba(255,255,255,.07); color: var(--text); }
+
+/* ===== FORMS ===== */
+.form-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.form-title { font-size: 15px; font-weight: 600; margin-bottom: 20px; }
+.form-row { display: grid; gap: 16px; margin-bottom: 16px; }
+.form-row-2 { grid-template-columns: 1fr 1fr; }
+.form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+.form-row-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group label { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text2); font-weight: 600; }
+.form-control {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  transition: border .15s;
+  width: 100%;
+}
+.form-control:focus { border-color: var(--accent); }
+.form-control[readonly] { opacity: .6; cursor: default; }
+select.form-control option { background: var(--card); }
+.form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.autocomplete-wrap { position: relative; }
+.autocomplete-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  z-index: 200;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.autocomplete-list div {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.autocomplete-list div:hover { background: rgba(59,130,246,.15); }
+
+/* ===== MODAL ===== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 90%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal-lg { max-width: 800px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.modal-header h3 { font-size: 15px; font-weight: 600; }
+.modal-close { background: none; border: none; color: var(--text2); font-size: 20px; cursor: pointer; }
+.modal-close:hover { color: var(--text); }
+
+/* ===== TOAST ===== */
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 18px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 240px;
+  animation: slideIn .2s ease;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+}
+.toast.success { border-left: 3px solid var(--success); }
+.toast.error { border-left: 3px solid var(--danger); }
+.toast.info { border-left: 3px solid var(--accent); }
+.toast.warning { border-left: 3px solid var(--warning); }
+@keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ===== FILTERS ===== */
+.filters-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.filters-bar .form-control { min-width: 120px; max-width: 180px; }
+
+/* ===== ALERTS ===== */
+.alert-box {
+  background: rgba(245,158,11,.08);
+  border: 1px solid rgba(245,158,11,.3);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.alert-box.danger { background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.3); }
+.alert-box h4 { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--warning); }
+.alert-box.danger h4 { color: var(--danger); }
+
+/* ===== EXPANDABLE ROWS ===== */
+.expand-row { display: none; }
+.expand-row.open { display: table-row; }
+.expand-content {
+  background: rgba(255,255,255,.02);
+  padding: 12px 16px;
+  border-top: 1px dashed var(--border);
+}
+.expand-content table { font-size: 12px; }
+.expand-content thead th { background: transparent; font-size: 10px; }
+
+/* ===== TABS ===== */
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.tab-btn {
+  padding: 10px 18px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ===== SECTION TITLE ===== */
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.section-sub { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
+
+/* ===== DARF CARDS ===== */
+.darf-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.darf-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.darf-card.due { border-color: rgba(239,68,68,.4); }
+.darf-card.paid { border-color: rgba(34,197,94,.3); opacity: .7; }
+.darf-card.exempt { border-color: rgba(139,148,158,.3); opacity: .6; }
+.darf-month { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.darf-value { font-size: 20px; font-weight: 700; color: var(--danger); margin: 8px 0; }
+.darf-value.paid-v { color: var(--success); }
+.darf-due { font-size: 11px; color: var(--text2); }
+
+/* ===== EXCHANGE CARDS ===== */
+.exchange-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.exchange-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.exchange-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.exchange-meta { font-size: 12px; color: var(--text2); }
+
+/* ===== GCAP TEXT ===== */
+.gcap-text {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  color: var(--text2);
+  max-height: 400px;
+  overflow-y: auto;
+  line-height: 1.6;
+}
+
+/* ===== PRINT ===== */
+@media print {
+  #sidebar, .topbar, .btn, .filters-bar, .form-actions, .no-print { display: none !important; }
+  .content { overflow: visible; padding: 0; }
+  body { overflow: auto; }
+  .chart-card, .table-card, .form-section { break-inside: avoid; }
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 900px) {
+  .cards-4 { grid-template-columns: repeat(2, 1fr); }
+  .charts-row { grid-template-columns: 1fr; }
+  .form-row-3 { grid-template-columns: 1fr 1fr; }
+  .form-row-4 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  :root { --sidebar-w: 60px; }
+  .nav-item span:not(.nav-icon) { display: none; }
+  .sidebar-logo .logo-text, .sidebar-logo .logo-sub, .nav-section-label { display: none; }
+  .cards-4, .cards-3 { grid-template-columns: 1fr 1fr; }
+  .form-row-2 { grid-template-columns: 1fr; }
+}
+
+/* ===== EXTRA UTILS ===== */
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.mt-0 { margin-top: 0 !important; }
+.mb-0 { margin-bottom: 0 !important; }
+.gap-8 { gap: 8px; }
+.flex { display: flex; align-items: center; gap: 8px; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+.empty-state { text-align: center; padding: 40px; color: var(--text2); font-size: 14px; }
+.empty-state .empty-icon { font-size: 36px; margin-bottom: 10px; }
+.info-box {
+  background: rgba(59,130,246,.08);
+  border: 1px solid rgba(59,130,246,.2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 16px;
+}
+.price-input-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.price-input-row:last-child { border-bottom: none; }
+.price-input-row .asset-sym { font-weight: 700; width: 60px; }
+.section-divider { font-size: 13px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; padding: 14px 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.highlight-row td { background: rgba(59,130,246,.06) !important; }
+.cursor-pointer { cursor: pointer; }
+.expand-toggle { cursor: pointer; font-size: 12px; color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <span class="logo-icon">₿</span>
+    <div>
+      <div class="logo-text">CryptoManager</div>
+      <div class="logo-sub">Portfólio BR</div>
+    </div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-label">Principal</div>
+    <div class="nav-item active" data-page="dashboard"><span class="nav-icon">🏠</span><span>Dashboard</span></div>
+    <div class="nav-item" data-page="nova-op"><span class="nav-icon">➕</span><span>Nova Operação</span></div>
+    <div class="nav-item" data-page="lotes"><span class="nav-icon">📦</span><span>Lotes</span></div>
+    <div class="nav-item" data-page="carteira"><span class="nav-icon">💼</span><span>Carteira</span></div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-label">Análise</div>
+    <div class="nav-item" data-page="pnl"><span class="nav-icon">📊</span><span>P&amp;L</span></div>
+    <div class="nav-item" data-page="impostos"><span class="nav-icon">🧾</span><span>Impostos</span></div>
+    <div class="nav-item" data-page="extrato"><span class="nav-icon">📋</span><span>Extrato</span></div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-label">Relatórios</div>
+    <div class="nav-item" data-page="mensal"><span class="nav-icon">📅</span><span>Rel. Mensal</span></div>
+    <div class="nav-item" data-page="anual"><span class="nav-icon">📆</span><span>Rel. Anual</span></div>
+    <div class="nav-item" data-page="permutas"><span class="nav-icon">🔄</span><span>Permutas</span></div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-label">Sistema</div>
+    <div class="nav-item" data-page="exchanges"><span class="nav-icon">🏦</span><span>Exchanges</span></div>
+    <div class="nav-item" data-page="configuracoes"><span class="nav-icon">⚙️</span><span>Configurações</span></div>
+    <div class="nav-item" data-page="exportar"><span class="nav-icon">📤</span><span>Exportar</span></div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div id="main">
+  <div class="topbar">
+    <h1 id="page-title">Dashboard</h1>
+    <span class="topbar-sub" id="topbar-sub">Portfólio de Criptoativos · Brasil</span>
+  </div>
+  <div class="content" id="content-area">
+    <!-- Pages rendered here -->
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="modal-exchange">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-exchange-title">Nova Exchange</h3>
+      <button class="modal-close" onclick="closeModal('modal-exchange')">✕</button>
+    </div>
+    <div class="form-row form-row-2">
+      <div class="form-group"><label>Nome *</label><input class="form-control" id="exc-nome" placeholder="Binance"></div>
+      <div class="form-group"><label>Tipo *</label>
+        <select class="form-control" id="exc-tipo">
+          <option value="Nacional">Nacional</option>
+          <option value="Estrangeira">Estrangeira</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row form-row-2">
+      <div class="form-group"><label>País</label><input class="form-control" id="exc-pais" placeholder="Brasil"></div>
+      <div class="form-group"><label>Site</label><input class="form-control" id="exc-site" placeholder="https://..."></div>
+    </div>
+    <div class="form-group" style="margin-bottom:16px"><label>Notas</label><textarea class="form-control" id="exc-notas" rows="2"></textarea></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-exchange')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveExchange()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3 id="modal-confirm-title">Confirmar</h3>
+      <button class="modal-close" onclick="closeModal('modal-confirm')">✕</button>
+    </div>
+    <p id="modal-confirm-text" style="font-size:14px;color:var(--text2);margin-bottom:20px"></p>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
+      <button class="btn btn-danger" id="modal-confirm-btn">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-prices">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Atualizar Preços</h3>
+      <button class="modal-close" onclick="closeModal('modal-prices')">✕</button>
+    </div>
+    <div id="price-inputs-container"></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-prices')">Cancelar</button>
+      <button class="btn btn-primary" onclick="savePrices()">Salvar Preços</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-gcap">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="modal-gcap-title">Resumo GCAP</h3>
+      <button class="modal-close" onclick="closeModal('modal-gcap')">✕</button>
+    </div>
+    <div class="gcap-text" id="modal-gcap-content"></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-gcap')">Fechar</button>
+      <button class="btn btn-primary" onclick="downloadGCAPModal()">⬇ Baixar TXT</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast-container"></div>
+
+<script>
+// ============================================================
+//  CONSTANTS & UTILS
+// ============================================================
+const ASSETS = ['BTC','ETH','SOL','BNB','ADA','DOT','MATIC','AVAX','LINK','XRP'];
+const LS_KEY = 'crypto_manager_data';
+const ISENCAO = 35000;
+const TAX_BRACKETS = [
+  { limit: 5000000, rate: 0.15 },
+  { limit: 10000000, rate: 0.175 },
+  { limit: 30000000, rate: 0.20 },
+  { limit: Infinity, rate: 0.225 }
+];
+
+function fmtBRL(v) {
+  if (v === null || v === undefined || isNaN(v)) return 'R$ 0,00';
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+function fmtNum(v, dec=8) {
+  if (v === null || v === undefined || isNaN(v)) return '0';
+  return parseFloat(v.toFixed(dec)).toLocaleString('pt-BR', { maximumFractionDigits: dec });
+}
+function fmtPct(v) {
+  if (v === null || v === undefined || isNaN(v)) return '0,00%';
+  return (v >= 0 ? '+' : '') + v.toFixed(2).replace('.', ',') + '%';
+}
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = new Date(d + (d.includes('T') ? '' : 'T00:00:00'));
+  return dt.toLocaleDateString('pt-BR');
+}
+function parseDate(str) {
+  // handles yyyy-mm-dd
+  return new Date(str + 'T00:00:00');
+}
+function toISO(d) {
+  if (!d) return '';
+  return d instanceof Date ? d.toISOString().slice(0,10) : d;
+}
+function monthKey(dateStr) {
+  const d = parseDate(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function monthLabel(key) {
+  const [y,m] = key.split('-');
+  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  return `${months[parseInt(m)-1]}/${y}`;
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function colorPL(v) { return v > 0 ? 'positive' : v < 0 ? 'negative' : 'neutral'; }
+function signStr(v) { return v >= 0 ? '+' : ''; }
+function el(id) { return document.getElementById(id); }
+function ce(tag, cls, html) { const e = document.createElement(tag); if(cls) e.className = cls; if(html) e.innerHTML = html; return e; }
+function escapeHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function lastBusinessDay(year, month) {
+  // last business day of month (Mon-Fri)
+  let d = new Date(year, month, 0); // last day
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate()-1);
+  return d;
+}
+function darfDueDate(salesMonthKey) {
+  const [y,m] = salesMonthKey.split('-').map(Number);
+  let nextM = m + 1, nextY = y;
+  if (nextM > 12) { nextM = 1; nextY++; }
+  const lbd = lastBusinessDay(nextY, nextM);
+  return lbd.toISOString().slice(0,10);
+}
+
+// ============================================================
+//  DATA STORE
+// ============================================================
+let DB = { operations:[], lots:[], lotConsumptions:[], exchanges:[], prices:{}, darfs:[], settings:{ costMethod:'FIFO', userName:'', cpf:'' } };
+
+function loadDB() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) DB = JSON.parse(raw);
+  } catch(e) {}
+}
+function saveDB() {
+  localStorage.setItem(LS_KEY, JSON.stringify(DB));
+}
+
+// ============================================================
+//  SAMPLE DATA
+// ============================================================
+function loadSampleData() {
+  DB.exchanges = [
+    { id:'exc-1', nome:'Binance', tipo:'Estrangeira', pais:'Ilhas Cayman', site:'https://binance.com', notas:'' },
+    { id:'exc-2', nome:'Mercado Bitcoin', tipo:'Nacional', pais:'Brasil', site:'https://mercadobitcoin.com.br', notas:'' },
+    { id:'exc-3', nome:'Kraken', tipo:'Estrangeira', pais:'EUA', site:'https://kraken.com', notas:'' }
+  ];
+  DB.prices = { BTC: 640000, ETH: 26500, SOL: 820, BNB: 3200 };
+  DB.settings = { costMethod:'FIFO', userName:'Paulo Marques', cpf:'' };
+  DB.operations = [];
+  DB.lots = [];
+  DB.lotConsumptions = [];
+  DB.darfs = [];
+
+  const ops = [
+    { date:'2024-01-15', type:'COMPRA', asset:'BTC', qty:0.5, price:195000, fees:97.50, exchangeId:'exc-1', obs:'Primeira compra de BTC' },
+    { date:'2024-02-20', type:'COMPRA', asset:'ETH', qty:3.0, price:12500, fees:37.50, exchangeId:'exc-1', obs:'' },
+    { date:'2024-03-10', type:'COMPRA', asset:'BTC', qty:0.25, price:340000, fees:85, exchangeId:'exc-2', obs:'' },
+    { date:'2024-04-05', type:'COMPRA', asset:'SOL', qty:20.0, price:650, fees:13, exchangeId:'exc-1', obs:'' },
+    { date:'2024-05-18', type:'VENDA', asset:'BTC', qty:0.3, price:430000, fees:129, exchangeId:'exc-1', obs:'' },
+    { date:'2024-06-22', type:'COMPRA', asset:'BNB', qty:5.0, price:1650, fees:8.25, exchangeId:'exc-1', obs:'' },
+    { date:'2024-07-30', type:'PERMUTA', assetFrom:'ETH', assetTo:'SOL', qtyFrom:1.0, qtyTo:25.0, refBRL:18500, fees:0, exchangeId:'exc-1', obs:'Permuta ETH→SOL' },
+    { date:'2024-08-14', type:'VENDA', asset:'ETH', qty:1.0, price:19000, fees:19, exchangeId:'exc-3', obs:'' },
+    { date:'2024-09-05', type:'COMPRA', asset:'BTC', qty:0.1, price:340000, fees:34, exchangeId:'exc-3', obs:'' },
+    { date:'2024-10-20', type:'VENDA', asset:'SOL', qty:15.0, price:1100, fees:16.50, exchangeId:'exc-1', obs:'' },
+    { date:'2024-11-11', type:'COMPRA', asset:'ETH', qty:2.0, price:22000, fees:44, exchangeId:'exc-2', obs:'' },
+    { date:'2024-12-28', type:'VENDA', asset:'BNB', qty:3.0, price:2800, fees:8.40, exchangeId:'exc-1', obs:'' },
+    { date:'2025-01-15', type:'COMPRA', asset:'BTC', qty:0.15, price:580000, fees:87, exchangeId:'exc-1', obs:'' },
+    { date:'2025-02-20', type:'VENDA', asset:'ETH', qty:1.5, price:25000, fees:37.50, exchangeId:'exc-3', obs:'' },
+    { date:'2025-03-08', type:'PERMUTA', assetFrom:'BNB', assetTo:'ETH', qtyFrom:2.0, qtyTo:0.3, refBRL:5600, fees:0, exchangeId:'exc-1', obs:'Permuta BNB→ETH' },
+    { date:'2025-04-10', type:'VENDA', asset:'BTC', qty:0.2, price:630000, fees:126, exchangeId:'exc-2', obs:'' },
+    { date:'2025-05-01', type:'COMPRA', asset:'SOL', qty:30.0, price:780, fees:23.40, exchangeId:'exc-1', obs:'' }
+  ];
+
+  for (const op of ops) {
+    processOperation(op);
+  }
+  saveDB();
+}
+
+// ============================================================
+//  OPERATION PROCESSING ENGINE
+// ============================================================
+function getNextLotNumber(asset) {
+  const existing = DB.lots.filter(l => l.asset === asset);
+  const nums = existing.map(l => {
+    const m = l.lotId.match(/-(\d+)$/);
+    return m ? parseInt(m[1]) : 0;
+  });
+  const next = nums.length ? Math.max(...nums) + 1 : 1;
+  return `${asset}-${String(next).padStart(3,'0')}`;
+}
+
+// ============================================================
+//  CORE ENGINE: consumeLots + processOperation (single definitions)
+// ============================================================
+
+function consumeLots(asset, qty, date, salePrice=0) {
+  const method = DB.settings.costMethod || 'FIFO';
+  let openLots = DB.lots.filter(l => l.asset === asset && l.qtyRemaining > 0);
+
+  if (method === 'FIFO') {
+    openLots.sort((a,b) => a.dateBuy.localeCompare(b.dateBuy));
+  } else if (method === 'LIFO') {
+    openLots.sort((a,b) => b.dateBuy.localeCompare(a.dateBuy));
+  } else {
+    openLots.sort((a,b) => a.dateBuy.localeCompare(b.dateBuy));
+  }
+
+  let remaining = qty;
+  let totalCost = 0;
+  const consumptions = [];
+
+  for (const lot of openLots) {
+    if (remaining <= 0) break;
+    const take = Math.min(lot.qtyRemaining, remaining);
+    totalCost += take * lot.costBasis;
+    remaining -= take;
+    lot.qtyRemaining = parseFloat((lot.qtyRemaining - take).toFixed(8));
+    lot.status = lot.qtyRemaining <= 0.000000001 ? 'Encerrado' : (lot.qtyRemaining < lot.qtyOriginal ? 'Parcial' : 'Aberto');
+    consumptions.push({ id: uid(), lotId: lot.lotId, asset, qtyConsumed: take, costBasis: lot.costBasis, totalCost: take*lot.costBasis });
+  }
+
+  const saleRevenue = qty * salePrice;
+  const gainLoss = saleRevenue - totalCost;
+  const avgCostBasis = qty > 0 ? totalCost / qty : 0;
+  return { consumptions, gainLoss, costBasis: avgCostBasis, totalCost };
+}
+
+function processOperation(op) {
+  const opId = uid();
+
+  if (op.type === 'COMPRA') {
+    const lotId = getNextLotNumber(op.asset);
+    const totalBRL = op.qty * op.price;
+    const costBasis = (totalBRL + (op.fees||0)) / op.qty;
+    const lot = {
+      id: uid(), lotId, asset: op.asset,
+      dateBuy: op.date, qtyOriginal: op.qty, qtyRemaining: op.qty,
+      priceBuy: op.price, costBasis, costTotal: totalBRL + (op.fees||0),
+      exchangeId: op.exchangeId, status: 'Aberto', operationId: opId
+    };
+    DB.lots.push(lot);
+    DB.operations.push({
+      id: opId, date: op.date, type: 'COMPRA', asset: op.asset,
+      qty: op.qty, price: op.price, totalBRL, fees: op.fees||0,
+      exchangeId: op.exchangeId, obs: op.obs||'',
+      lotIds: [lotId], gainLoss: null
+    });
+
+  } else if (op.type === 'VENDA') {
+    const totalBRL = op.qty * op.price;
+    const { consumptions, gainLoss, costBasis } = consumeLots(op.asset, op.qty, op.date, op.price);
+    const netGain = gainLoss - (op.fees||0);
+    DB.operations.push({
+      id: opId, date: op.date, type: 'VENDA', asset: op.asset,
+      qty: op.qty, price: op.price, totalBRL, fees: op.fees||0,
+      exchangeId: op.exchangeId, obs: op.obs||'',
+      lotIds: consumptions.map(c => c.lotId), gainLoss: netGain,
+      costBasis, grossGain: gainLoss
+    });
+    for (const c of consumptions) {
+      DB.lotConsumptions.push({ ...c, operationId: opId, saleDate: op.date, salePrice: op.price });
+    }
+
+  } else if (op.type === 'PERMUTA') {
+    const sellPrice = op.refBRL / op.qtyFrom;
+    const { consumptions, gainLoss } = consumeLots(op.assetFrom, op.qtyFrom, op.date, sellPrice);
+    const netGain = gainLoss - (op.fees||0);
+
+    const lotId = getNextLotNumber(op.assetTo);
+    const costBasisTo = op.refBRL / op.qtyTo;
+    DB.lots.push({
+      id: uid(), lotId, asset: op.assetTo,
+      dateBuy: op.date, qtyOriginal: op.qtyTo, qtyRemaining: op.qtyTo,
+      priceBuy: costBasisTo, costBasis: costBasisTo, costTotal: op.refBRL,
+      exchangeId: op.exchangeId, status: 'Aberto', operationId: opId
+    });
+    DB.operations.push({
+      id: opId, date: op.date, type: 'PERMUTA',
+      asset: op.assetFrom, assetTo: op.assetTo,
+      qty: op.qtyFrom, qtyTo: op.qtyTo,
+      price: sellPrice, totalBRL: op.refBRL, fees: op.fees||0,
+      exchangeId: op.exchangeId, obs: op.obs||'',
+      lotIds: consumptions.map(c => c.lotId).concat([lotId]),
+      gainLoss: netGain, grossGain: gainLoss, refBRL: op.refBRL
+    });
+    for (const c of consumptions) {
+      DB.lotConsumptions.push({ ...c, operationId: opId, saleDate: op.date, salePrice: sellPrice });
+    }
+  }
+}
+
+// ============================================================
+//  TAX ENGINE
+// ============================================================
+function calcTaxes() {
+  const salesOps = DB.operations.filter(o => o.type === 'VENDA' || o.type === 'PERMUTA');
+  const byMonth = {};
+
+  for (const op of salesOps) {
+    const mk = monthKey(op.date);
+    if (!byMonth[mk]) byMonth[mk] = { ops:[], totalSales:0, totalGains:0, totalLosses:0 };
+    const totalSale = op.type === 'PERMUTA' ? op.refBRL : op.totalBRL;
+    byMonth[mk].totalSales += totalSale;
+    byMonth[mk].ops.push(op);
+    const gl = op.gainLoss || 0;
+    if (gl > 0) byMonth[mk].totalGains += gl;
+    else byMonth[mk].totalLosses += Math.abs(gl);
+  }
+
+  const months = Object.keys(byMonth).sort();
+  let accumulatedLoss = 0;
+  const result = [];
+
+  for (const mk of months) {
+    const m = byMonth[mk];
+    const isExempt = m.totalSales <= ISENCAO;
+    const netGain = m.totalGains - m.totalLosses;
+    let taxBase = 0, tax = 0, lossCompensated = 0, aliquota = 0;
+
+    if (!isExempt && netGain > 0) {
+      const beforeComp = netGain;
+      lossCompensated = Math.min(accumulatedLoss, netGain);
+      taxBase = netGain - lossCompensated;
+      accumulatedLoss -= lossCompensated;
+      if (taxBase > 0) {
+        tax = calcProgressiveTax(taxBase);
+        aliquota = tax / taxBase;
+      }
+    } else if (netGain < 0) {
+      accumulatedLoss += Math.abs(netGain);
+    }
+
+    const dueDate = darfDueDate(mk);
+    const existingDarf = DB.darfs.find(d => d.monthKey === mk);
+    const darfStatus = existingDarf ? existingDarf.status : (isExempt ? 'Isento' : (tax > 0 ? 'Pendente' : 'Sem imposto'));
+
+    result.push({
+      monthKey: mk,
+      label: monthLabel(mk),
+      totalSales: m.totalSales,
+      totalGains: m.totalGains,
+      totalLosses: m.totalLosses,
+      netGain,
+      lossCompensated,
+      taxBase,
+      aliquota,
+      tax,
+      isExempt,
+      dueDate,
+      darfStatus,
+      ops: m.ops
+    });
+  }
+
+  return result;
+}
+
+function calcProgressiveTax(base) {
+  let tax = 0, prev = 0;
+  for (const bracket of TAX_BRACKETS) {
+    const taxable = Math.min(base, bracket.limit) - prev;
+    if (taxable <= 0) break;
+    tax += taxable * bracket.rate;
+    prev = bracket.limit;
+    if (base <= bracket.limit) break;
+  }
+  return tax;
+}
+
+function getTaxSummary() {
+  const taxes = calcTaxes();
+  const current = new Date();
+  const currentMk = `${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}`;
+  const thisMonth = taxes.find(t => t.monthKey === currentMk);
+  const unpaid = taxes.filter(t => t.darfStatus === 'Pendente' && t.tax > 0);
+  const accLoss = taxes.reduce((acc, t) => {
+    if (!t.isExempt && t.netGain < 0) return acc + Math.abs(t.netGain);
+    if (!t.isExempt && t.netGain > 0) return Math.max(0, acc - t.lossCompensated);
+    return acc;
+  }, 0);
+  return { thisMonth, unpaid, taxes, accLoss };
+}
+
+// ============================================================
+//  PORTFOLIO CALCULATIONS
+// ============================================================
+function getPortfolio() {
+  const assets = {};
+  for (const lot of DB.lots) {
+    if (lot.qtyRemaining <= 0.000000001) continue;
+    if (!assets[lot.asset]) assets[lot.asset] = { qty: 0, totalCost: 0, lots: [] };
+    assets[lot.asset].qty += lot.qtyRemaining;
+    assets[lot.asset].totalCost += lot.qtyRemaining * lot.costBasis;
+    assets[lot.asset].lots.push(lot);
+  }
+  let totalCurrentValue = 0;
+  const result = [];
+  for (const [asset, data] of Object.entries(assets)) {
+    const avgCost = data.qty > 0 ? data.totalCost / data.qty : 0;
+    const currentPrice = DB.prices[asset] || 0;
+    const currentValue = data.qty * currentPrice;
+    const pl = currentValue - data.totalCost;
+    const plPct = data.totalCost > 0 ? (pl / data.totalCost) * 100 : 0;
+    totalCurrentValue += currentValue;
+    result.push({ asset, qty: data.qty, avgCost, totalCost: data.totalCost, currentPrice, currentValue, pl, plPct, lots: data.lots });
+  }
+  for (const row of result) {
+    row.portfolioPct = totalCurrentValue > 0 ? (row.currentValue / totalCurrentValue) * 100 : 0;
+  }
+  return { assets: result, totalCurrentValue };
+}
+
+function getTotalInvested() {
+  return DB.operations.filter(o => o.type === 'COMPRA').reduce((s, o) => s + o.totalBRL + o.fees, 0);
+}
+
+function getRealizedPL() {
+  return DB.operations
+    .filter(o => (o.type === 'VENDA' || o.type === 'PERMUTA') && o.gainLoss !== null)
+    .reduce((s, o) => s + o.gainLoss, 0);
+}
+
+function getExchange(id) {
+  return DB.exchanges.find(e => e.id === id) || { nome: id||'N/A', tipo:'-' };
+}
+
+// ============================================================
+//  NAVIGATION
+// ============================================================
+const PAGES = {
+  dashboard: { title:'Dashboard', render: renderDashboard },
+  'nova-op': { title:'Nova Operação', render: renderNovaOp },
+  lotes: { title:'Gestão de Lotes', render: renderLotes },
+  carteira: { title:'Carteira', render: renderCarteira },
+  pnl: { title:'P&L — Lucro e Perda', render: renderPnl },
+  impostos: { title:'Impostos (GCAP/DARF)', render: renderImpostos },
+  extrato: { title:'Extrato de Operações', render: renderExtrato },
+  mensal: { title:'Relatório Mensal', render: renderMensal },
+  anual: { title:'Relatório Anual', render: renderAnual },
+  permutas: { title:'Permutas', render: renderPermutas },
+  exchanges: { title:'Exchanges', render: renderExchanges },
+  configuracoes: { title:'Configurações', render: renderConfiguracoes },
+  exportar: { title:'Exportar Dados', render: renderExportar }
+};
+
+let currentPage = 'dashboard';
+const chartInstances = {};
+
+function navigate(page) {
+  currentPage = page;
+  // destroy old charts
+  Object.values(chartInstances).forEach(c => { try { c.destroy(); } catch(e){} });
+  Object.keys(chartInstances).forEach(k => delete chartInstances[k]);
+
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
+  el('page-title').textContent = PAGES[page]?.title || page;
+  PAGES[page]?.render();
+  el('content-area').scrollTop = 0;
+}
+
+document.querySelectorAll('.nav-item').forEach(n => {
+  n.addEventListener('click', () => navigate(n.dataset.page));
+});
+
+// ============================================================
+//  PAGE: DASHBOARD
+// ============================================================
+function renderDashboard() {
+  const portfolio = getPortfolio();
+  const totalInvested = getTotalInvested();
+  const realizedPL = getRealizedPL();
+  const unrealizedPL = portfolio.assets.reduce((s,a) => s+a.pl, 0);
+  const totalPL = realizedPL + unrealizedPL;
+  const totalPLPct = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0;
+  const taxSummary = getTaxSummary();
+  const estimatedTax = taxSummary.thisMonth ? taxSummary.thisMonth.tax : 0;
+  const totalOps = DB.operations.length;
+  const numAssets = portfolio.assets.length;
+
+  // Accumulated loss calculation
+  let accLoss = 0;
+  const taxes = calcTaxes();
+  let runningLoss = 0;
+  for (const t of taxes) {
+    if (!t.isExempt && t.netGain < 0) runningLoss += Math.abs(t.netGain);
+    else if (!t.isExempt && t.netGain > 0) runningLoss = Math.max(0, runningLoss - t.lossCompensated);
+  }
+  accLoss = runningLoss;
+
+  const unpaidDarfs = taxSummary.unpaid;
+
+  let html = `
+  <div class="cards-row cards-4">
+    <div class="card">
+      <div class="card-label">💰 Total Investido</div>
+      <div class="card-value">${fmtBRL(totalInvested)}</div>
+      <div class="card-sub">Custo total de aquisição</div>
+    </div>
+    <div class="card">
+      <div class="card-label">📈 Valor Atual</div>
+      <div class="card-value">${fmtBRL(portfolio.totalCurrentValue)}</div>
+      <div class="card-sub">Baseado nos preços atuais</div>
+    </div>
+    <div class="card">
+      <div class="card-label">📊 Lucro / Perda Total</div>
+      <div class="card-value ${colorPL(totalPL)}">${fmtBRL(totalPL)}</div>
+      <div class="card-sub ${colorPL(totalPLPct)}">${fmtPct(totalPLPct)} · Real: ${fmtBRL(realizedPL)} · Não real: ${fmtBRL(unrealizedPL)}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">🧾 Imposto Est. do Mês</div>
+      <div class="card-value ${estimatedTax > 0 ? 'negative' : 'neutral'}">${fmtBRL(estimatedTax)}</div>
+      <div class="card-sub">${estimatedTax > 0 ? 'DARF pendente' : 'Sem imposto este mês'}</div>
+    </div>
+  </div>
+  <div class="cards-row cards-3">
+    <div class="card">
+      <div class="card-label">₿ Ativos em Carteira</div>
+      <div class="card-value">${numAssets}</div>
+      <div class="card-sub">${portfolio.assets.map(a=>a.asset).join(', ') || 'Nenhum'}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">📋 Total de Operações</div>
+      <div class="card-value">${totalOps}</div>
+      <div class="card-sub">Compras, vendas e permutas</div>
+    </div>
+    <div class="card">
+      <div class="card-label">⚠️ Prejuízo a Compensar</div>
+      <div class="card-value ${accLoss > 0 ? 'warning-text' : 'neutral'}">${fmtBRL(accLoss)}</div>
+      <div class="card-sub">Compensação automática nas vendas</div>
+    </div>
+  </div>`;
+
+  if (unpaidDarfs.length > 0) {
+    html += `<div class="alert-box danger"><h4>⚠️ Alertas de Imposto</h4>`;
+    for (const d of unpaidDarfs) {
+      html += `<div style="margin-bottom:4px">• DARF ${d.label}: <strong>${fmtBRL(d.tax)}</strong> — Vencimento: ${fmtDate(d.dueDate)} <button class="btn btn-sm btn-ghost" onclick="navigate('impostos')">Ver Impostos</button></div>`;
+    }
+    html += `</div>`;
+  }
+
+  html += `
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">📈 Evolução do Patrimônio (últimos 12 meses)</div>
+      <div class="chart-wrap"><canvas id="chart-patrimonio" height="200"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">🥧 Distribuição da Carteira</div>
+      <div class="chart-wrap"><canvas id="chart-dist" height="200"></canvas></div>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-header"><h3>📋 Resumo por Ativo</h3></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Ativo</th><th>Quantidade</th><th>Custo Médio</th><th>Total Investido</th>
+          <th>Preço Atual</th><th>Valor Atual</th><th>P&L BRL</th><th>P&L %</th>
+        </tr></thead>
+        <tbody>`;
+  for (const a of portfolio.assets) {
+    html += `<tr>
+      <td><strong>${a.asset}</strong></td>
+      <td class="td-mono">${fmtNum(a.qty,8)}</td>
+      <td>${fmtBRL(a.avgCost)}</td>
+      <td>${fmtBRL(a.totalCost)}</td>
+      <td>${fmtBRL(a.currentPrice)}</td>
+      <td>${fmtBRL(a.currentValue)}</td>
+      <td class="${colorPL(a.pl)}">${fmtBRL(a.pl)}</td>
+      <td class="${colorPL(a.plPct)}">${fmtPct(a.plPct)}</td>
+    </tr>`;
+  }
+  if (!portfolio.assets.length) html += `<tr><td colspan="8" class="empty-state">Nenhum ativo em carteira</td></tr>`;
+  html += `</tbody></table></div></div>`;
+
+  el('content-area').innerHTML = html;
+
+  // Chart: Patrimônio evolution (simulate from operations)
+  const now = new Date();
+  const labels = [], values = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    labels.push(monthLabel(mk));
+    // sum investments up to this month
+    const endDate = toISO(new Date(d.getFullYear(), d.getMonth()+1, 0));
+    let val = 0;
+    for (const lot of DB.lots) {
+      if (lot.dateBuy <= endDate) {
+        const rem = Math.max(0, lot.qtyRemaining);
+        const price = DB.prices[lot.asset] || lot.costBasis;
+        val += lot.qtyOriginal * price;
+      }
+    }
+    values.push(val > 0 ? val : null);
+  }
+  // Fill nulls with previous value
+  let last = 0;
+  for (let i = 0; i < values.length; i++) {
+    if (values[i] === null) values[i] = last;
+    else last = values[i];
+  }
+
+  const ctxP = el('chart-patrimonio');
+  if (ctxP) {
+    chartInstances['patrimonio'] = new Chart(ctxP, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{ label:'Patrimônio (BRL)', data: values, borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,.1)', fill:true, tension:0.4, pointRadius:4, pointBackgroundColor:'#3b82f6' }]
+      },
+      options: { responsive:true, plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>`  ${fmtBRL(ctx.parsed.y)}`}}}, scales:{ x:{ticks:{color:'#8b949e'},grid:{color:'rgba(255,255,255,.05)'}}, y:{ticks:{color:'#8b949e',callback:v=>fmtBRL(v)},grid:{color:'rgba(255,255,255,.05)'}}}}
+    });
+  }
+
+  // Chart: Donut distribution
+  const ctxD = el('chart-dist');
+  if (ctxD && portfolio.assets.length) {
+    const palette = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#10b981'];
+    chartInstances['dist'] = new Chart(ctxD, {
+      type: 'doughnut',
+      data: {
+        labels: portfolio.assets.map(a=>a.asset),
+        datasets: [{ data: portfolio.assets.map(a=>a.currentValue), backgroundColor: palette.slice(0, portfolio.assets.length), borderWidth:2, borderColor:'#161b27' }]
+      },
+      options: { responsive:true, plugins:{ legend:{ position:'bottom', labels:{color:'#f0f6fc',padding:12,font:{size:12}}}, tooltip:{ callbacks:{ label:ctx=>`${ctx.label}: ${fmtBRL(ctx.parsed)} (${ctx.parsed > 0 && portfolio.totalCurrentValue > 0 ? ((ctx.parsed/portfolio.totalCurrentValue)*100).toFixed(1) : 0}%)` }}}}
+    });
+  }
+}
+
+// ============================================================
+//  PAGE: NOVA OPERAÇÃO
+// ============================================================
+function renderNovaOp(opToEdit) {
+  const excOptions = DB.exchanges.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
+  const assetOpts = ASSETS.map(a => `<option value="${a}">${a}</option>`).join('');
+  const isEdit = !!opToEdit;
+  const op = opToEdit || {};
+
+  const html = `
+  <div class="form-section">
+    <div class="form-title">${isEdit ? '✏️ Editar Operação' : '➕ Registrar Nova Operação'}</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tipo de Operação *</label>
+        <select class="form-control" id="op-type" onchange="onOpTypeChange()">
+          <option value="COMPRA" ${op.type==='COMPRA'?'selected':''}>Compra</option>
+          <option value="VENDA" ${op.type==='VENDA'?'selected':''}>Venda</option>
+          <option value="PERMUTA" ${op.type==='PERMUTA'?'selected':''}>Permuta (Swap)</option>
+        </select>
+      </div>
+      <div class="form-group" id="op-asset-group">
+        <label>Ativo *</label>
+        <div class="autocomplete-wrap">
+          <input class="form-control" id="op-asset" placeholder="BTC, ETH, SOL..." value="${op.asset||''}" autocomplete="off" oninput="showAC('op-asset','op-ac-list')">
+          <div class="autocomplete-list" id="op-ac-list" style="display:none"></div>
+        </div>
+      </div>
+      <div class="form-group" id="op-date-group">
+        <label>Data *</label>
+        <input type="date" class="form-control" id="op-date" value="${op.date||new Date().toISOString().slice(0,10)}">
+      </div>
+    </div>
+
+    <!-- Permuta fields -->
+    <div id="permuta-fields" style="display:none">
+      <div class="form-row form-row-3">
+        <div class="form-group">
+          <label>De (Ativo Saída) *</label>
+          <div class="autocomplete-wrap">
+            <input class="form-control" id="perm-asset-from" placeholder="ETH" autocomplete="off" oninput="showAC('perm-asset-from','perm-ac-from')">
+            <div class="autocomplete-list" id="perm-ac-from" style="display:none"></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Quantidade Saída *</label>
+          <input type="number" class="form-control" id="perm-qty-from" step="0.00000001" placeholder="1.0">
+        </div>
+        <div class="form-group">
+          <label>Para (Ativo Entrada) *</label>
+          <div class="autocomplete-wrap">
+            <input class="form-control" id="perm-asset-to" placeholder="SOL" autocomplete="off" oninput="showAC('perm-asset-to','perm-ac-to')">
+            <div class="autocomplete-list" id="perm-ac-to" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+      <div class="form-row form-row-3">
+        <div class="form-group">
+          <label>Quantidade Entrada *</label>
+          <input type="number" class="form-control" id="perm-qty-to" step="0.00000001" placeholder="25.0">
+        </div>
+        <div class="form-group">
+          <label>Valor BRL Referência *</label>
+          <input type="number" class="form-control" id="perm-ref-brl" step="0.01" placeholder="18500.00">
+        </div>
+        <div class="form-group"></div>
+      </div>
+    </div>
+
+    <!-- Normal buy/sell fields -->
+    <div id="normal-fields">
+      <div class="form-row form-row-4">
+        <div class="form-group">
+          <label>Quantidade *</label>
+          <input type="number" class="form-control" id="op-qty" step="0.00000001" value="${op.qty||''}" oninput="calcTotal()" placeholder="0.00000000">
+        </div>
+        <div class="form-group">
+          <label>Preço Unit. BRL *</label>
+          <input type="number" class="form-control" id="op-price" step="0.01" value="${op.price||''}" oninput="calcTotal()" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Total BRL</label>
+          <input type="number" class="form-control" id="op-total" readonly placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Taxas/Fees BRL</label>
+          <input type="number" class="form-control" id="op-fees" step="0.01" value="${op.fees||0}" placeholder="0.00">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-row form-row-2">
+      <div class="form-group" id="op-exc-group">
+        <label>Exchange *</label>
+        <select class="form-control" id="op-exchange">${excOptions}</select>
+      </div>
+      <div class="form-group">
+        <label>Observações</label>
+        <input class="form-control" id="op-obs" value="${escapeHtml(op.obs||'')}" placeholder="Opcional">
+      </div>
+    </div>
+
+    <div class="form-actions">
+      ${isEdit ? `<button class="btn btn-ghost" onclick="navigate('extrato')">Cancelar</button>` : '<button class="btn btn-ghost" onclick="resetForm()">Limpar</button>'}
+      <button class="btn btn-primary" onclick="saveOperation(${isEdit ? `'${op.id}'` : 'null'})">${isEdit ? 'Atualizar' : '✓ Registrar Operação'}</button>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <strong>ℹ️ Informações:</strong><br>
+    • <strong>Compra:</strong> Cria um novo lote numerado automaticamente<br>
+    • <strong>Venda:</strong> Consome lotes pelo método configurado (${DB.settings.costMethod||'FIFO'})<br>
+    • <strong>Permuta:</strong> Tratada como venda do ativo saída + compra do ativo entrada (evento tributável pela RFB)
+  </div>`;
+
+  el('content-area').innerHTML = html;
+  onOpTypeChange();
+  if (op.type) el('op-type').value = op.type;
+  if (op.qty && op.price) calcTotal();
+}
+
+function onOpTypeChange() {
+  const type = el('op-type').value;
+  const isPerm = type === 'PERMUTA';
+  el('permuta-fields').style.display = isPerm ? 'block' : 'none';
+  el('normal-fields').style.display = isPerm ? 'none' : 'block';
+  el('op-asset-group').style.display = isPerm ? 'none' : '';
+}
+
+function calcTotal() {
+  const qty = parseFloat(el('op-qty')?.value) || 0;
+  const price = parseFloat(el('op-price')?.value) || 0;
+  if (el('op-total')) el('op-total').value = (qty * price).toFixed(2);
+}
+
+function showAC(inputId, listId) {
+  const input = el(inputId);
+  const list = el(listId);
+  if (!input || !list) return;
+  const val = input.value.toUpperCase();
+  const matches = ASSETS.filter(a => a.includes(val));
+  if (!matches.length || !val) { list.style.display = 'none'; return; }
+  list.innerHTML = matches.map(a => `<div onclick="selectAC('${inputId}','${listId}','${a}')">${a}</div>`).join('');
+  list.style.display = 'block';
+}
+
+function selectAC(inputId, listId, val) {
+  el(inputId).value = val;
+  el(listId).style.display = 'none';
+}
+
+document.addEventListener('click', e => {
+  document.querySelectorAll('.autocomplete-list').forEach(l => { if (!l.contains(e.target)) l.style.display = 'none'; });
+});
+
+function resetForm() { renderNovaOp(); }
+
+function saveOperation(editId) {
+  const type = el('op-type').value;
+
+  if (editId) {
+    showToast('Edição completa não suportada — delete e recrie a operação.', 'info');
+    return;
+  }
+
+  if (type === 'PERMUTA') {
+    const assetFrom = el('perm-asset-from').value.toUpperCase().trim();
+    const assetTo = el('perm-asset-to').value.toUpperCase().trim();
+    const qtyFrom = parseFloat(el('perm-qty-from').value);
+    const qtyTo = parseFloat(el('perm-qty-to').value);
+    const refBRL = parseFloat(el('perm-ref-brl').value);
+    const date = el('op-date').value;
+    const exchangeId = el('op-exchange').value;
+    const fees = parseFloat(el('op-fees')?.value||0) || 0;
+    const obs = el('op-obs')?.value || '';
+
+    if (!assetFrom || !assetTo || !qtyFrom || !qtyTo || !refBRL || !date) {
+      showToast('Preencha todos os campos obrigatórios', 'error'); return;
+    }
+    processOperation({ type:'PERMUTA', assetFrom, assetTo, qtyFrom, qtyTo, refBRL, date, exchangeId, fees, obs });
+    saveDB(); showToast('Permuta registrada com sucesso!', 'success'); renderNovaOp();
+    return;
+  }
+
+  const asset = el('op-asset').value.toUpperCase().trim();
+  const qty = parseFloat(el('op-qty').value);
+  const price = parseFloat(el('op-price').value);
+  const fees = parseFloat(el('op-fees').value||0) || 0;
+  const date = el('op-date').value;
+  const exchangeId = el('op-exchange').value;
+  const obs = el('op-obs').value;
+
+  if (!asset || !qty || !price || !date) {
+    showToast('Preencha todos os campos obrigatórios', 'error'); return;
+  }
+  if (qty <= 0 || price <= 0) {
+    showToast('Quantidade e preço devem ser maiores que zero', 'error'); return;
+  }
+
+  processOperation({ type, asset, qty, price, fees, date, exchangeId, obs });
+  saveDB(); showToast(`${type === 'COMPRA' ? 'Compra' : 'Venda'} registrada com sucesso!`, 'success');
+  renderNovaOp();
+}
+
+// ============================================================
+//  PAGE: LOTES
+// ============================================================
+let lotesView = 'lotes';
+let lotFilters = { asset:'', status:'', exchangeId:'', from:'', to:'' };
+
+function renderLotes() {
+  const excOptions = `<option value="">Todas exchanges</option>` + DB.exchanges.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
+  const assetSet = [...new Set(DB.lots.map(l=>l.asset))].sort();
+  const assetOpts = `<option value="">Todos ativos</option>` + assetSet.map(a=>`<option value="${a}">${a}</option>`).join('');
+
+  let html = `
+  <div class="tabs">
+    <button class="tab-btn ${lotesView==='lotes'?'active':''}" onclick="setLotesView('lotes')">📦 Por Lote (Individual)</button>
+    <button class="tab-btn ${lotesView==='ativo'?'active':''}" onclick="setLotesView('ativo')">📊 Por Ativo (Consolidado)</button>
+  </div>
+  <div class="filters-bar">
+    <select class="form-control" id="lf-asset" onchange="applyLotFilters()">${assetOpts}</select>
+    <select class="form-control" id="lf-status" onchange="applyLotFilters()">
+      <option value="">Todos status</option>
+      <option value="Aberto">Aberto</option>
+      <option value="Parcial">Parcial</option>
+      <option value="Encerrado">Encerrado</option>
+    </select>
+    <select class="form-control" id="lf-exchange" onchange="applyLotFilters()">${excOptions}</select>
+    <input type="date" class="form-control" id="lf-from" onchange="applyLotFilters()" placeholder="De">
+    <input type="date" class="form-control" id="lf-to" onchange="applyLotFilters()" placeholder="Até">
+    <button class="btn btn-ghost btn-sm" onclick="clearLotFilters()">✕ Limpar</button>
+  </div>
+  <div id="lotes-content"></div>`;
+
+  el('content-area').innerHTML = html;
+  renderLotesContent();
+}
+
+function setLotesView(v) { lotesView = v; renderLotes(); }
+function applyLotFilters() {
+  lotFilters.asset = el('lf-asset')?.value||'';
+  lotFilters.status = el('lf-status')?.value||'';
+  lotFilters.exchangeId = el('lf-exchange')?.value||'';
+  lotFilters.from = el('lf-from')?.value||'';
+  lotFilters.to = el('lf-to')?.value||'';
+  renderLotesContent();
+}
+function clearLotFilters() {
+  lotFilters = { asset:'', status:'', exchangeId:'', from:'', to:'' };
+  if(el('lf-asset')) el('lf-asset').value='';
+  if(el('lf-status')) el('lf-status').value='';
+  if(el('lf-exchange')) el('lf-exchange').value='';
+  if(el('lf-from')) el('lf-from').value='';
+  if(el('lf-to')) el('lf-to').value='';
+  renderLotesContent();
+}
+
+function renderLotesContent() {
+  let lots = DB.lots.filter(l => {
+    if (lotFilters.asset && l.asset !== lotFilters.asset) return false;
+    if (lotFilters.status && l.status !== lotFilters.status) return false;
+    if (lotFilters.exchangeId && l.exchangeId !== lotFilters.exchangeId) return false;
+    if (lotFilters.from && l.dateBuy < lotFilters.from) return false;
+    if (lotFilters.to && l.dateBuy > lotFilters.to) return false;
+    return true;
+  });
+
+  if (lotesView === 'lotes') {
+    let html = `<div class="table-card"><div class="table-header"><h3>📦 ${lots.length} lote(s)</h3></div><div class="table-wrap"><table>
+      <thead><tr>
+        <th>Lote</th><th>Ativo</th><th>Data Compra</th><th>Qtd Original</th>
+        <th>Qtd Restante</th><th>Custo Médio Aq.</th><th>Custo Total</th><th>Status</th><th>Ações</th>
+      </tr></thead><tbody>`;
+
+    for (const lot of lots.sort((a,b)=>a.lotId.localeCompare(b.lotId))) {
+      const badge = lot.status==='Aberto' ? 'badge-green' : lot.status==='Parcial' ? 'badge-yellow' : 'badge-gray';
+      const cons = DB.lotConsumptions.filter(c => c.lotId === lot.lotId);
+      const rowId = `lot-row-${lot.id.replace(/[^a-z0-9]/gi,'_')}`;
+      html += `<tr class="cursor-pointer" onclick="toggleLotExpand('${rowId}')">
+        <td><span class="expand-toggle">▶</span> <strong>${lot.lotId}</strong></td>
+        <td>${lot.asset}</td>
+        <td>${fmtDate(lot.dateBuy)}</td>
+        <td class="td-mono">${fmtNum(lot.qtyOriginal,8)}</td>
+        <td class="td-mono">${fmtNum(lot.qtyRemaining,8)}</td>
+        <td>${fmtBRL(lot.costBasis)}</td>
+        <td>${fmtBRL(lot.costTotal)}</td>
+        <td><span class="badge ${badge}">${lot.status}</span></td>
+        <td><button class="btn-icon" title="Excluir" onclick="event.stopPropagation();confirmDeleteLot('${lot.id}')">🗑️</button></td>
+      </tr>`;
+      if (cons.length) {
+        html += `<tr class="expand-row" id="${rowId}"><td colspan="9"><div class="expand-content">
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text2)">Consumos deste lote:</div>
+          <table><thead><tr><th>Data Venda</th><th>Operação</th><th>Qtd Consumida</th><th>Custo Unit.</th><th>Custo Total</th><th>Preço Venda</th></tr></thead><tbody>`;
+        for (const c of cons) {
+          const saleOp = DB.operations.find(o => o.id === c.operationId);
+          html += `<tr>
+            <td>${fmtDate(c.saleDate)}</td>
+            <td>${saleOp ? (saleOp.type==='PERMUTA'?`Permuta → ${saleOp.assetTo}`:`Venda ${saleOp.asset}`) : '-'}</td>
+            <td class="td-mono">${fmtNum(c.qtyConsumed,8)}</td>
+            <td>${fmtBRL(c.costBasis)}</td>
+            <td>${fmtBRL(c.totalCost)}</td>
+            <td>${fmtBRL(c.salePrice)}</td>
+          </tr>`;
+        }
+        html += `</tbody></table></div></td></tr>`;
+      }
+    }
+    if (!lots.length) html += `<tr><td colspan="9" class="empty-state">Nenhum lote encontrado</td></tr>`;
+    html += `</tbody></table></div></div>`;
+    el('lotes-content').innerHTML = html;
+
+  } else {
+    // By asset
+    const byAsset = {};
+    for (const lot of lots) {
+      if (!byAsset[lot.asset]) byAsset[lot.asset] = { lots:[], openLots:0, totalQty:0, totalCost:0 };
+      byAsset[lot.asset].lots.push(lot);
+      if (lot.status !== 'Encerrado') {
+        byAsset[lot.asset].openLots++;
+        byAsset[lot.asset].totalQty += lot.qtyRemaining;
+        byAsset[lot.asset].totalCost += lot.qtyRemaining * lot.costBasis;
+      }
+    }
+    let html = `<div class="table-card"><div class="table-header"><h3>📊 Por Ativo</h3>
+      <div class="actions"><label style="font-size:12px;color:var(--text2)">Custeio:</label>
+        <select class="form-control" style="width:140px" onchange="DB.settings.costMethod=this.value;saveDB();renderLotesContent()">
+          <option value="FIFO" ${DB.settings.costMethod==='FIFO'?'selected':''}>FIFO</option>
+          <option value="LIFO" ${DB.settings.costMethod==='LIFO'?'selected':''}>LIFO</option>
+          <option value="Custo Médio" ${DB.settings.costMethod==='Custo Médio'?'selected':''}>Custo Médio</option>
+        </select>
+      </div>
+    </div><div class="table-wrap"><table>
+      <thead><tr>
+        <th>Ativo</th><th>Lotes Abertos</th><th>Qtd Total</th><th>Custo Médio</th>
+        <th>Total Investido</th><th>Preço Atual</th><th>Valor Atual</th><th>P&L Não Real.</th><th>Status</th>
+      </tr></thead><tbody>`;
+    for (const [asset, d] of Object.entries(byAsset)) {
+      const avgCost = d.totalQty > 0 ? d.totalCost / d.totalQty : 0;
+      const curPrice = DB.prices[asset]||0;
+      const curVal = d.totalQty * curPrice;
+      const pl = curVal - d.totalCost;
+      const status = d.totalQty > 0 ? 'Ativo' : 'Zerado';
+      html += `<tr>
+        <td><strong>${asset}</strong></td>
+        <td>${d.openLots}</td>
+        <td class="td-mono">${fmtNum(d.totalQty,8)}</td>
+        <td>${fmtBRL(avgCost)}</td>
+        <td>${fmtBRL(d.totalCost)}</td>
+        <td>${fmtBRL(curPrice)}</td>
+        <td>${fmtBRL(curVal)}</td>
+        <td class="${colorPL(pl)}">${fmtBRL(pl)}</td>
+        <td><span class="badge ${status==='Ativo'?'badge-green':'badge-gray'}">${status}</span></td>
+      </tr>`;
+    }
+    if (!Object.keys(byAsset).length) html += `<tr><td colspan="9" class="empty-state">Nenhum ativo</td></tr>`;
+    html += `</tbody></table></div></div>`;
+    el('lotes-content').innerHTML = html;
+  }
+}
+
+function toggleLotExpand(rowId) {
+  const row = el(rowId);
+  if (!row) return;
+  row.classList.toggle('open');
+  const toggle = row.previousElementSibling?.querySelector('.expand-toggle');
+  if (toggle) toggle.textContent = row.classList.contains('open') ? '▼' : '▶';
+}
+
+function confirmDeleteLot(lotId) {
+  showConfirm('Excluir lote?', 'Esta ação não pode ser desfeita e pode afetar o cálculo de impostos.', () => {
+    DB.lots = DB.lots.filter(l => l.id !== lotId);
+    saveDB(); showToast('Lote excluído', 'success'); renderLotes();
+  });
+}
+
+// ============================================================
+//  PAGE: CARTEIRA
+// ============================================================
+function renderCarteira() {
+  const portfolio = getPortfolio();
+  const palette = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#10b981'];
+
+  let html = `
+  <div class="flex-between" style="margin-bottom:16px">
+    <div>
+      <div class="section-title">💼 Carteira</div>
+      <div class="section-sub">Posições abertas e desempenho</div>
+    </div>
+    <button class="btn btn-ghost" onclick="openPriceModal()">🔄 Atualizar Preços</button>
+  </div>
+
+  <div class="charts-row">
+    <div class="table-card" style="margin:0">
+      <div class="table-header"><h3>Posições</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Ativo</th><th>Quantidade</th><th>Custo Médio</th><th>Total Investido</th>
+            <th>Preço Atual</th><th>Valor Atual</th><th>P&L BRL</th><th>P&L %</th><th>% Cart.</th>
+          </tr></thead><tbody>`;
+
+  for (const a of portfolio.assets) {
+    html += `<tr>
+      <td><strong>${a.asset}</strong></td>
+      <td class="td-mono">${fmtNum(a.qty,8)}</td>
+      <td>${fmtBRL(a.avgCost)}</td>
+      <td>${fmtBRL(a.totalCost)}</td>
+      <td>${fmtBRL(a.currentPrice)}</td>
+      <td>${fmtBRL(a.currentValue)}</td>
+      <td class="${colorPL(a.pl)}">${fmtBRL(a.pl)}</td>
+      <td class="${colorPL(a.plPct)}">${fmtPct(a.plPct)}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="background:var(--border);border-radius:4px;height:6px;width:60px;overflow:hidden">
+            <div style="background:${palette[portfolio.assets.indexOf(a)%palette.length]};height:100%;width:${a.portfolioPct.toFixed(1)}%"></div>
+          </div>
+          ${a.portfolioPct.toFixed(1)}%
+        </div>
+      </td>
+    </tr>`;
+  }
+
+  // Totals
+  const totalCost = portfolio.assets.reduce((s,a)=>s+a.totalCost,0);
+  const totalVal = portfolio.totalCurrentValue;
+  const totalPL = portfolio.assets.reduce((s,a)=>s+a.pl,0);
+  const totalPLPct = totalCost > 0 ? (totalPL/totalCost)*100 : 0;
+
+  html += `<tr class="totals-row">
+    <td colspan="3"><strong>TOTAL</strong></td>
+    <td>${fmtBRL(totalCost)}</td>
+    <td>—</td>
+    <td>${fmtBRL(totalVal)}</td>
+    <td class="${colorPL(totalPL)}">${fmtBRL(totalPL)}</td>
+    <td class="${colorPL(totalPLPct)}">${fmtPct(totalPLPct)}</td>
+    <td>100%</td>
+  </tr>`;
+
+  if (!portfolio.assets.length) html += `<tr><td colspan="9" class="empty-state">Carteira vazia</td></tr>`;
+  html += `</tbody></table></div></div>
+
+    <div class="chart-card" style="margin:0">
+      <div class="chart-title">Alocação da Carteira</div>
+      <canvas id="chart-cart-donut"></canvas>
+    </div>
+  </div>`;
+
+  el('content-area').innerHTML = html;
+
+  if (portfolio.assets.length) {
+    const ctx = el('chart-cart-donut');
+    chartInstances['cart-donut'] = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: portfolio.assets.map(a=>a.asset),
+        datasets: [{ data: portfolio.assets.map(a=>a.currentValue), backgroundColor: palette.slice(0,portfolio.assets.length), borderWidth:2, borderColor:'#161b27' }]
+      },
+      options: { responsive:true, plugins:{ legend:{ position:'bottom', labels:{color:'#f0f6fc',padding:10}}, tooltip:{ callbacks:{ label:ctx=>`${ctx.label}: ${fmtBRL(ctx.parsed)}`}}}}
+    });
+  }
+}
+
+function openPriceModal() {
+  const portfolio = getPortfolio();
+  let html = '';
+  for (const a of portfolio.assets) {
+    html += `<div class="price-input-row">
+      <span class="asset-sym">${a.asset}</span>
+      <span style="flex:1;font-size:12px;color:var(--text2)">Atual: ${fmtBRL(a.currentPrice)}</span>
+      <input type="number" class="form-control" id="price-${a.asset}" value="${a.currentPrice}" style="width:160px" step="0.01">
+    </div>`;
+  }
+  // Add any asset in prices not in portfolio
+  for (const [asset, price] of Object.entries(DB.prices)) {
+    if (!portfolio.assets.find(a=>a.asset===asset)) {
+      html += `<div class="price-input-row">
+        <span class="asset-sym">${asset}</span>
+        <span style="flex:1;font-size:12px;color:var(--text2)">Atual: ${fmtBRL(price)}</span>
+        <input type="number" class="form-control" id="price-${asset}" value="${price}" style="width:160px" step="0.01">
+      </div>`;
+    }
+  }
+  el('price-inputs-container').innerHTML = html || '<p style="color:var(--text2);font-size:13px">Nenhum ativo em carteira</p>';
+  openModal('modal-prices');
+}
+
+function savePrices() {
+  const portfolio = getPortfolio();
+  const allAssets = [...new Set([...portfolio.assets.map(a=>a.asset), ...Object.keys(DB.prices)])];
+  for (const asset of allAssets) {
+    const inp = el(`price-${asset}`);
+    if (inp) DB.prices[asset] = parseFloat(inp.value)||0;
+  }
+  saveDB(); closeModal('modal-prices'); showToast('Preços atualizados!', 'success');
+  renderCarteira();
+}
+
+// ============================================================
+//  PAGE: P&L
+// ============================================================
+let pnlTab = 'realizado';
+
+function renderPnl() {
+  let html = `
+  <div class="tabs">
+    <button class="tab-btn ${pnlTab==='realizado'?'active':''}" onclick="setPnlTab('realizado')">✅ P&L Realizado</button>
+    <button class="tab-btn ${pnlTab==='nao-realizado'?'active':''}" onclick="setPnlTab('nao-realizado')">📊 P&L Não Realizado</button>
+    <button class="tab-btn ${pnlTab==='por-ativo'?'active':''}" onclick="setPnlTab('por-ativo')">₿ Por Ativo</button>
+  </div>
+  <div id="pnl-content"></div>`;
+  el('content-area').innerHTML = html;
+  renderPnlContent();
+}
+
+function setPnlTab(t) { pnlTab = t; renderPnl(); }
+
+function renderPnlContent() {
+  if (pnlTab === 'realizado') {
+    const ops = DB.operations.filter(o => (o.type==='VENDA'||o.type==='PERMUTA') && o.gainLoss !== null)
+      .sort((a,b) => a.date.localeCompare(b.date));
+
+    let totalSales = 0, totalCost = 0, totalFees = 0, totalGL = 0;
+
+    let html = `<div class="table-card">
+      <div class="table-header"><h3>P&L Realizado — ${ops.length} operações</h3></div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Data</th><th>Tipo</th><th>Ativo</th><th>Qtd</th>
+          <th>Custo Aq.</th><th>Valor Venda</th><th>Taxas</th><th>Ganho Bruto</th><th>Ganho Líq.</th>
+        </tr></thead><tbody>`;
+
+    for (const op of ops) {
+      const saleVal = op.type==='PERMUTA' ? op.refBRL : op.totalBRL;
+      const costAq = (op.costBasis||0) * op.qty;
+      const grossGain = op.grossGain !== undefined ? op.grossGain : (saleVal - costAq);
+      totalSales += saleVal;
+      totalCost += costAq;
+      totalFees += op.fees;
+      totalGL += op.gainLoss;
+      html += `<tr>
+        <td>${fmtDate(op.date)}</td>
+        <td><span class="badge ${op.type==='PERMUTA'?'badge-swap':'badge-sell'}">${op.type}</span></td>
+        <td>${op.type==='PERMUTA' ? `${op.asset} → ${op.assetTo}` : op.asset}</td>
+        <td class="td-mono">${fmtNum(op.qty,8)}</td>
+        <td>${fmtBRL(costAq)}</td>
+        <td>${fmtBRL(saleVal)}</td>
+        <td>${fmtBRL(op.fees)}</td>
+        <td class="${colorPL(grossGain)}">${fmtBRL(grossGain)}</td>
+        <td class="${colorPL(op.gainLoss)}">${fmtBRL(op.gainLoss)}</td>
+      </tr>`;
+    }
+    html += `<tr class="totals-row">
+      <td colspan="4">TOTAL</td>
+      <td>${fmtBRL(totalCost)}</td>
+      <td>${fmtBRL(totalSales)}</td>
+      <td>${fmtBRL(totalFees)}</td>
+      <td>—</td>
+      <td class="${colorPL(totalGL)}">${fmtBRL(totalGL)}</td>
+    </tr>`;
+    if (!ops.length) html += `<tr><td colspan="9" class="empty-state">Nenhuma venda registrada</td></tr>`;
+    html += `</tbody></table></div></div>`;
+
+    // Monthly P&L chart
+    html += `<div class="chart-card"><div class="chart-title">📊 P&L Realizado por Mês</div><canvas id="chart-pnl-monthly" height="120"></canvas></div>`;
+    el('pnl-content').innerHTML = html;
+
+    // Build monthly data
+    const monthlyPL = {};
+    for (const op of ops) {
+      const mk = monthKey(op.date);
+      monthlyPL[mk] = (monthlyPL[mk]||0) + op.gainLoss;
+    }
+    const now = new Date();
+    const mLabels = [], mValues = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      mLabels.push(monthLabel(mk));
+      mValues.push(monthlyPL[mk]||0);
+    }
+    const ctx = el('chart-pnl-monthly');
+    if (ctx) {
+      chartInstances['pnl-monthly'] = new Chart(ctx, {
+        type:'bar',
+        data:{ labels:mLabels, datasets:[{ label:'P&L', data:mValues, backgroundColor:mValues.map(v=>v>=0?'rgba(34,197,94,.7)':'rgba(239,68,68,.7)'), borderColor:mValues.map(v=>v>=0?'#22c55e':'#ef4444'), borderWidth:1 }]},
+        options:{ responsive:true, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>`  ${fmtBRL(ctx.parsed.y)}`}}}, scales:{ x:{ticks:{color:'#8b949e'},grid:{color:'rgba(255,255,255,.05)'}}, y:{ticks:{color:'#8b949e',callback:v=>fmtBRL(v)},grid:{color:'rgba(255,255,255,.05)'}}}}
+      });
+    }
+
+  } else if (pnlTab === 'nao-realizado') {
+    const portfolio = getPortfolio();
+    let html = `<div class="table-card">
+      <div class="table-header"><h3>P&L Não Realizado</h3></div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Ativo</th><th>Quantidade</th><th>Custo Médio</th><th>Preço Atual</th>
+          <th>Valor Atual</th><th>P&L BRL</th><th>P&L %</th>
+        </tr></thead><tbody>`;
+    for (const a of portfolio.assets) {
+      html += `<tr>
+        <td><strong>${a.asset}</strong></td>
+        <td class="td-mono">${fmtNum(a.qty,8)}</td>
+        <td>${fmtBRL(a.avgCost)}</td>
+        <td>${fmtBRL(a.currentPrice)}</td>
+        <td>${fmtBRL(a.currentValue)}</td>
+        <td class="${colorPL(a.pl)}">${fmtBRL(a.pl)}</td>
+        <td class="${colorPL(a.plPct)}">${fmtPct(a.plPct)}</td>
+      </tr>`;
+    }
+    if (!portfolio.assets.length) html += `<tr><td colspan="7" class="empty-state">Carteira vazia</td></tr>`;
+    html += `</tbody></table></div></div>`;
+    el('pnl-content').innerHTML = html;
+
+  } else {
+    // Por ativo
+    const portfolio = getPortfolio();
+    const realizedByAsset = {};
+    DB.operations.filter(o => (o.type==='VENDA'||o.type==='PERMUTA') && o.gainLoss!==null).forEach(o => {
+      const a = o.asset;
+      if (!realizedByAsset[a]) realizedByAsset[a] = 0;
+      realizedByAsset[a] += o.gainLoss;
+    });
+    const allAssets = [...new Set([...portfolio.assets.map(a=>a.asset), ...Object.keys(realizedByAsset)])].sort();
+
+    let html = `<div class="table-card">
+      <div class="table-header"><h3>P&L por Ativo</h3></div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Ativo</th><th>P&L Realizado</th><th>P&L Não Realizado</th><th>P&L Total</th>
+        </tr></thead><tbody>`;
+    for (const asset of allAssets) {
+      const realized = realizedByAsset[asset]||0;
+      const portAsset = portfolio.assets.find(a=>a.asset===asset);
+      const unrealized = portAsset ? portAsset.pl : 0;
+      const total = realized + unrealized;
+      html += `<tr>
+        <td><strong>${asset}</strong></td>
+        <td class="${colorPL(realized)}">${fmtBRL(realized)}</td>
+        <td class="${colorPL(unrealized)}">${fmtBRL(unrealized)}</td>
+        <td class="${colorPL(total)}">${fmtBRL(total)}</td>
+      </tr>`;
+    }
+    if (!allAssets.length) html += `<tr><td colspan="4" class="empty-state">Sem dados</td></tr>`;
+    html += `</tbody></table></div></div>`;
+    el('pnl-content').innerHTML = html;
+  }
+}
+
+// ============================================================
+//  PAGE: IMPOSTOS
+// ============================================================
+let impostosTab = 'apuracao';
+
+function renderImpostos() {
+  let html = `
+  <div class="tabs">
+    <button class="tab-btn ${impostosTab==='apuracao'?'active':''}" onclick="setImpostosTab('apuracao')">🧾 Apuração Mensal</button>
+    <button class="tab-btn ${impostosTab==='darf'?'active':''}" onclick="setImpostosTab('darf')">📄 DARFs</button>
+    <button class="tab-btn ${impostosTab==='prejuizo'?'active':''}" onclick="setImpostosTab('prejuizo')">📉 Prejuízo Acumulado</button>
+    <button class="tab-btn ${impostosTab==='gcap'?'active':''}" onclick="setImpostosTab('gcap')">📋 GCAP Export</button>
+  </div>
+  <div id="impostos-content"></div>`;
+  el('content-area').innerHTML = html;
+  renderImpostosContent();
+}
+
+function setImpostosTab(t) { impostosTab = t; renderImpostos(); }
+
+function renderImpostosContent() {
+  const taxes = calcTaxes();
+
+  if (impostosTab === 'apuracao') {
+    let html = `
+    <div class="info-box">
+      <strong>Regras brasileiras (Lei 13.259/16 + IN 1.888/19):</strong> Isenção para vendas ≤ R$ 35.000/mês. 
+      Acima disso: alíquota progressiva de 15% (até R$5M) a 22,5% (acima de R$30M). 
+      Perdas de meses anteriores são compensadas automaticamente.
+    </div>
+    <div class="table-card">
+      <div class="table-header"><h3>Apuração Mensal de Imposto</h3></div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Mês</th><th>Total Vendas</th><th>Ganhos</th><th>Perdas</th>
+          <th>Ganho Líq.</th><th>Prejuízo Comp.</th><th>Base Cálculo</th>
+          <th>Alíquota</th><th>Imposto</th><th>Isento?</th><th>DARF</th>
+        </tr></thead><tbody>`;
+
+    for (const t of taxes) {
+      const darfPaid = DB.darfs.find(d => d.monthKey === t.monthKey && d.status === 'Pago');
+      const rowClass = darfPaid ? 'highlight-row' : '';
+      html += `<tr class="${rowClass} cursor-pointer" onclick="toggleTaxExpand('tax-exp-${t.monthKey}')">
+        <td><span class="expand-toggle">▶</span> <strong>${t.label}</strong></td>
+        <td>${fmtBRL(t.totalSales)}</td>
+        <td class="positive">${fmtBRL(t.totalGains)}</td>
+        <td class="negative">${fmtBRL(t.totalLosses)}</td>
+        <td class="${colorPL(t.netGain)}">${fmtBRL(t.netGain)}</td>
+        <td class="warning-text">${fmtBRL(t.lossCompensated)}</td>
+        <td>${fmtBRL(t.taxBase)}</td>
+        <td>${t.aliquota > 0 ? (t.aliquota*100).toFixed(1)+'%' : '—'}</td>
+        <td class="${t.tax > 0 ? 'negative' : 'neutral'}">${fmtBRL(t.tax)}</td>
+        <td><span class="badge ${t.isExempt ? 'badge-gray' : 'badge-red'}">${t.isExempt ? 'Isento' : 'Tributável'}</span></td>
+        <td>
+          ${t.tax > 0 ? `
+            <span class="badge ${darfPaid ? 'badge-green' : 'badge-red'}">${darfPaid ? 'Pago' : 'Pendente'}</span>
+            ${!darfPaid ? `<button class="btn btn-sm btn-success" style="margin-left:6px" onclick="event.stopPropagation();markDARFPaid('${t.monthKey}','${t.tax}')">✓ Pagar</button>` : ''}
+          ` : '<span class="badge badge-gray">N/A</span>'}
+        </td>
+      </tr>
+      <tr class="expand-row" id="tax-exp-${t.monthKey}">
+        <td colspan="11"><div class="expand-content">
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text2)">Operações em ${t.label}:</div>
+          <table><thead><tr><th>Data</th><th>Tipo</th><th>Ativo</th><th>Valor Venda</th><th>Custo</th><th>G/P Líquido</th><th>Exchange</th><th>GCAP?</th></tr></thead><tbody>`;
+      for (const op of t.ops) {
+        const exc = getExchange(op.exchangeId);
+        const saleVal = op.type==='PERMUTA'?op.refBRL:op.totalBRL;
+        const costAq = (op.costBasis||0)*op.qty;
+        html += `<tr>
+          <td>${fmtDate(op.date)}</td>
+          <td><span class="badge ${op.type==='PERMUTA'?'badge-swap':'badge-sell'}">${op.type}</span></td>
+          <td>${op.asset}</td>
+          <td>${fmtBRL(saleVal)}</td>
+          <td>${fmtBRL(costAq)}</td>
+          <td class="${colorPL(op.gainLoss)}">${fmtBRL(op.gainLoss)}</td>
+          <td>${exc.nome}</td>
+          <td>${exc.tipo==='Estrangeira'?'<span class="badge badge-yellow">GCAP</span>':'—'}</td>
+        </tr>`;
+      }
+      html += `</tbody></table></div></td></tr>`;
+    }
+    if (!taxes.length) html += `<tr><td colspan="11" class="empty-state">Nenhuma venda registrada</td></tr>`;
+    html += `</tbody></table></div></div>`;
+    el('impostos-content').innerHTML = html;
+
+  } else if (impostosTab === 'darf') {
+    const darfMonths = taxes.filter(t => t.tax > 0);
+    let html = `<div class="darf-cards">`;
+    for (const t of darfMonths) {
+      const paid = DB.darfs.find(d => d.monthKey === t.monthKey && d.status === 'Pago');
+      html += `<div class="darf-card ${paid ? 'paid' : 'due'}">
+        <div class="darf-month">${t.label}</div>
+        <div class="darf-value ${paid?'paid-v':''}">${fmtBRL(t.tax)}</div>
+        <div class="darf-due">Vencimento: ${fmtDate(t.dueDate)}</div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+          <span class="badge ${paid?'badge-green':'badge-red'}">${paid?'Pago':'Pendente'}</span>
+          ${!paid ? `<button class="btn btn-sm btn-success" onclick="markDARFPaid('${t.monthKey}','${t.tax}')">✓ Marcar Pago</button>` : `<span style="font-size:11px;color:var(--text2)">${fmtDate(paid.datePaid)}</span>`}
+        </div>
+      </div>`;
+    }
+    if (!darfMonths.length) html += `<div class="empty-state"><div class="empty-icon">✅</div>Nenhum DARF pendente</div>`;
+    html += `</div>`;
+    el('impostos-content').innerHTML = html;
+
+  } else if (impostosTab === 'prejuizo') {
+    let runLoss = 0;
+    let html = `<div class="table-card">
+      <div class="table-header"><h3>Histórico de Prejuízo Acumulado</h3></div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Mês</th><th>Ganho Líquido do Mês</th><th>Prejuízo Compensado</th><th>Variação</th><th>Acumulado</th>
+        </tr></thead><tbody>`;
+    for (const t of taxes) {
+      const variation = !t.isExempt && t.netGain < 0 ? Math.abs(t.netGain) : (!t.isExempt && t.netGain > 0 ? -t.lossCompensated : 0);
+      runLoss += variation;
+      html += `<tr>
+        <td><strong>${t.label}</strong></td>
+        <td class="${colorPL(t.netGain)}">${fmtBRL(t.netGain)}</td>
+        <td class="warning-text">${fmtBRL(t.lossCompensated)}</td>
+        <td class="${variation >= 0 ? 'negative' : 'positive'}">${variation >= 0 ? '+' : ''}${fmtBRL(variation)}</td>
+        <td class="${runLoss > 0 ? 'warning-text' : 'neutral'}"><strong>${fmtBRL(runLoss)}</strong></td>
+      </tr>`;
+    }
+    if (!taxes.length) html += `<tr><td colspan="5" class="empty-state">Sem dados</td></tr>`;
+    html += `</tbody></table></div></div>`;
+    el('impostos-content').innerHTML = html;
+
+  } else { // gcap
+    const gcapText = generateGCAPText(taxes);
+    let html = `
+    <div class="info-box">
+      Resumo formatado para preenchimento manual no programa GCAP (Ganhos de Capital) da Receita Federal.
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <h3>Resumo GCAP</h3>
+        <div class="actions">
+          <button class="btn btn-ghost" onclick="copyText('gcap-full')">📋 Copiar</button>
+          <button class="btn btn-primary" onclick="downloadText('gcap-full','GCAP_Resumo.txt')">⬇ Baixar TXT</button>
+        </div>
+      </div>
+      <div class="gcap-text" id="gcap-full">${escapeHtml(gcapText)}</div>
+    </div>`;
+    el('impostos-content').innerHTML = html;
+  }
+}
+
+function toggleTaxExpand(id) {
+  const row = el(id);
+  if (!row) return;
+  row.classList.toggle('open');
+  const toggle = row.previousElementSibling?.querySelector('.expand-toggle');
+  if (toggle) toggle.textContent = row.classList.contains('open') ? '▼' : '▶';
+}
+
+function markDARFPaid(monthKey, tax) {
+  const existing = DB.darfs.findIndex(d => d.monthKey === monthKey);
+  const darf = { id: uid(), monthKey, tax: parseFloat(tax), status:'Pago', datePaid: new Date().toISOString().slice(0,10) };
+  if (existing >= 0) DB.darfs[existing] = darf;
+  else DB.darfs.push(darf);
+  saveDB(); showToast('DARF marcado como pago!', 'success');
+  renderImpostosContent();
+}
+
+function generateGCAPText(taxes) {
+  let text = `RESUMO GCAP — GANHOS DE CAPITAL EM CRIPTOATIVOS\n`;
+  text += `Contribuinte: ${DB.settings.userName || 'NÃO INFORMADO'}\n`;
+  text += `CPF: ${DB.settings.cpf || 'NÃO INFORMADO'}\n`;
+  text += `Gerado em: ${new Date().toLocaleDateString('pt-BR')}\n`;
+  text += `${'='.repeat(60)}\n\n`;
+
+  for (const t of taxes.filter(t => t.totalSales > 0)) {
+    text += `PERÍODO: ${t.label}\n`;
+    text += `Tipo de Bem: Criptoativos (Art. 3º IN RFB 1.888/2019)\n`;
+    text += `Total de Alienações no Mês: ${fmtBRL(t.totalSales)}\n`;
+    text += `Situação: ${t.isExempt ? '✓ ISENTO (vendas ≤ R$ 35.000,00)' : '✗ TRIBUTÁVEL (vendas > R$ 35.000,00)'}\n`;
+    if (!t.isExempt) {
+      text += `\nDETALHE DOS BENS ALIENADOS:\n`;
+      for (const op of t.ops) {
+        const exc = getExchange(op.exchangeId);
+        const saleVal = op.type==='PERMUTA'?op.refBRL:op.totalBRL;
+        const costAq = (op.costBasis||0)*op.qty;
+        text += `  • ${fmtDate(op.date)} - ${op.asset} (${op.type})\n`;
+        text += `    Valor de Alienação: ${fmtBRL(saleVal)}\n`;
+        text += `    Custo de Aquisição: ${fmtBRL(costAq)}\n`;
+        text += `    Ganho de Capital: ${fmtBRL(saleVal - costAq)}\n`;
+        text += `    Exchange: ${exc.nome} (${exc.tipo}, ${exc.pais||'Brasil'})\n`;
+        if (exc.tipo==='Estrangeira') text += `    *** GCAP: Declarar como corretora estrangeira (País: ${exc.pais}) ***\n`;
+      }
+      text += `\nRESUMO GCAP:\n`;
+      text += `  Ganhos no Mês: ${fmtBRL(t.totalGains)}\n`;
+      text += `  Perdas no Mês: ${fmtBRL(t.totalLosses)}\n`;
+      text += `  Prejuízo Compensado: ${fmtBRL(t.lossCompensated)}\n`;
+      text += `  Base de Cálculo: ${fmtBRL(t.taxBase)}\n`;
+      text += `  Alíquota: ${(t.aliquota*100).toFixed(1)}%\n`;
+      text += `  IMPOSTO DEVIDO (DARF): ${fmtBRL(t.tax)}\n`;
+      text += `  Vencimento DARF: ${fmtDate(t.dueDate)}\n`;
+    }
+    text += `\n${'─'.repeat(60)}\n\n`;
+  }
+  return text;
+}
+
+// ============================================================
+//  PAGE: EXTRATO
+// ============================================================
+let extratoFilters = { type:'', asset:'', exchangeId:'', from:'', to:'', gainLoss:'' };
+let extratoSort = { col:'date', dir:'desc' };
+
+function renderExtrato() {
+  const excOptions = `<option value="">Todas exchanges</option>` + DB.exchanges.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('');
+  const assetSet = [...new Set(DB.operations.map(o=>o.asset))].sort();
+  const assetOpts = `<option value="">Todos ativos</option>` + assetSet.map(a=>`<option value="${a}">${a}</option>`).join('');
+
+  let html = `
+  <div class="filters-bar">
+    <select class="form-control" id="ef-type" onchange="applyExtratoFilters()">
+      <option value="">Todos tipos</option>
+      <option value="COMPRA">Compra</option>
+      <option value="VENDA">Venda</option>
+      <option value="PERMUTA">Permuta</option>
+    </select>
+    <select class="form-control" id="ef-asset" onchange="applyExtratoFilters()">${assetOpts}</select>
+    <select class="form-control" id="ef-exchange" onchange="applyExtratoFilters()">${excOptions}</select>
+    <input type="date" class="form-control" id="ef-from" onchange="applyExtratoFilters()">
+    <input type="date" class="form-control" id="ef-to" onchange="applyExtratoFilters()">
+    <select class="form-control" id="ef-gl" onchange="applyExtratoFilters()">
+      <option value="">G/P: Todos</option>
+      <option value="gain">Ganho</option>
+      <option value="loss">Perda</option>
+    </select>
+    <button class="btn btn-ghost btn-sm" onclick="clearExtratoFilters()">✕ Limpar</button>
+    <button class="btn btn-primary btn-sm" onclick="exportExtratoCsv()">⬇ CSV</button>
+  </div>
+  <div id="extrato-table-wrap"></div>`;
+  el('content-area').innerHTML = html;
+  renderExtratoTable();
+}
+
+function applyExtratoFilters() {
+  extratoFilters.type = el('ef-type')?.value||'';
+  extratoFilters.asset = el('ef-asset')?.value||'';
+  extratoFilters.exchangeId = el('ef-exchange')?.value||'';
+  extratoFilters.from = el('ef-from')?.value||'';
+  extratoFilters.to = el('ef-to')?.value||'';
+  extratoFilters.gainLoss = el('ef-gl')?.value||'';
+  renderExtratoTable();
+}
+
+function clearExtratoFilters() {
+  extratoFilters = { type:'', asset:'', exchangeId:'', from:'', to:'', gainLoss:'' };
+  ['ef-type','ef-asset','ef-exchange','ef-from','ef-to','ef-gl'].forEach(id => { const e = el(id); if(e) e.value=''; });
+  renderExtratoTable();
+}
+
+function sortExtrato(col) {
+  if (extratoSort.col === col) extratoSort.dir = extratoSort.dir === 'asc' ? 'desc' : 'asc';
+  else { extratoSort.col = col; extratoSort.dir = 'asc'; }
+  renderExtratoTable();
+}
+
+function renderExtratoTable() {
+  let ops = DB.operations.filter(o => {
+    if (extratoFilters.type && o.type !== extratoFilters.type) return false;
+    if (extratoFilters.asset && o.asset !== extratoFilters.asset) return false;
+    if (extratoFilters.exchangeId && o.exchangeId !== extratoFilters.exchangeId) return false;
+    if (extratoFilters.from && o.date < extratoFilters.from) return false;
+    if (extratoFilters.to && o.date > extratoFilters.to) return false;
+    if (extratoFilters.gainLoss === 'gain' && (o.gainLoss === null || o.gainLoss <= 0)) return false;
+    if (extratoFilters.gainLoss === 'loss' && (o.gainLoss === null || o.gainLoss >= 0)) return false;
+    return true;
+  });
+
+  // Sort
+  ops = ops.sort((a,b) => {
+    let va = a[extratoSort.col], vb = b[extratoSort.col];
+    if (typeof va === 'string') va = va.toLowerCase(), vb = (vb||'').toLowerCase();
+    if (extratoSort.dir === 'desc') [va,vb] = [vb,va];
+    return va < vb ? -1 : va > vb ? 1 : 0;
+  });
+
+  const cols = ['date','type','asset','qty','price','totalBRL','fees','exchangeId','gainLoss'];
+  const colLabels = ['Data','Tipo','Ativo','Qtd','Preço Unit.','Total BRL','Taxas','Exchange','G/P'];
+
+  let html = `<div class="table-card">
+    <div class="table-header"><h3>📋 ${ops.length} operações</h3></div>
+    <div class="table-wrap"><table>
+      <thead><tr>`;
+  for (let i=0; i<cols.length; i++) {
+    const isSort = extratoSort.col === cols[i];
+    html += `<th onclick="sortExtrato('${cols[i]}')" class="${isSort?'sorted':''}">
+      ${colLabels[i]}<span class="sort-icon">${isSort ? (extratoSort.dir==='asc'?'▲':'▼') : '↕'}</span>
+    </th>`;
+  }
+  html += `<th>Lote(s)</th><th>Obs</th></tr></thead><tbody>`;
+
+  for (const op of ops) {
+    const exc = getExchange(op.exchangeId);
+    const lotStr = (op.lotIds||[]).join(', ');
+    html += `<tr>
+      <td>${fmtDate(op.date)}</td>
+      <td><span class="badge ${op.type==='COMPRA'?'badge-buy':op.type==='VENDA'?'badge-sell':'badge-swap'}">${op.type}</span></td>
+      <td>${op.type==='PERMUTA'?`${op.asset}→${op.assetTo||''}`:op.asset}</td>
+      <td class="td-mono">${fmtNum(op.qty,8)}</td>
+      <td>${fmtBRL(op.price)}</td>
+      <td>${fmtBRL(op.totalBRL)}</td>
+      <td>${fmtBRL(op.fees)}</td>
+      <td>${exc.nome}</td>
+      <td class="${op.gainLoss !== null ? colorPL(op.gainLoss) : 'neutral'}">${op.gainLoss !== null ? fmtBRL(op.gainLoss) : '—'}</td>
+      <td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis">${escapeHtml(lotStr)}</td>
+      <td style="font-size:11px;color:var(--text2)">${escapeHtml(op.obs||'')}</td>
+    </tr>`;
+  }
+  if (!ops.length) html += `<tr><td colspan="11" class="empty-state">Nenhuma operação</td></tr>`;
+  html += `</tbody></table></div></div>`;
+  el('extrato-table-wrap').innerHTML = html;
+}
+
+function exportExtratoCsv() {
+  const ops = DB.operations;
+  const rows = [['Data','Tipo','Ativo','Qtd','Preço Unit BRL','Total BRL','Taxas','Exchange','Lotes','G/P Líquido','Obs']];
+  for (const op of ops) {
+    const exc = getExchange(op.exchangeId);
+    rows.push([
+      op.date, op.type, op.type==='PERMUTA'?`${op.asset}→${op.assetTo}`:op.asset,
+      op.qty, op.price, op.totalBRL, op.fees, exc.nome,
+      (op.lotIds||[]).join(';'), op.gainLoss ?? '', op.obs||''
+    ]);
+  }
+  downloadCSV(rows, 'Extrato_Operacoes.csv');
+}
+
+// ============================================================
+//  PAGE: RELATÓRIO MENSAL
+// ============================================================
+function renderMensal() {
+  const now = new Date();
+  const html = `
+  <div class="flex-between" style="margin-bottom:20px">
+    <div><div class="section-title">📅 Relatório Mensal</div></div>
+    <div class="flex">
+      <select class="form-control" id="mensal-month" onchange="renderMensalContent()">
+        ${Array.from({length:12},(_,i)=>{
+          const v = String(i+1).padStart(2,'0');
+          const months=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+          return `<option value="${v}" ${(now.getMonth()+1)===i+1?'selected':''}>${months[i]}</option>`;
+        }).join('')}
+      </select>
+      <select class="form-control" id="mensal-year" onchange="renderMensalContent()">
+        ${[2024,2025,2026].map(y=>`<option value="${y}" ${now.getFullYear()===y?'selected':''}>${y}</option>`).join('')}
+      </select>
+      <button class="btn btn-ghost no-print" onclick="window.print()">🖨️ Imprimir</button>
+    </div>
+  </div>
+  <div id="mensal-content"></div>`;
+  el('content-area').innerHTML = html;
+  renderMensalContent();
+}
+
+function renderMensalContent() {
+  const m = el('mensal-month')?.value || '01';
+  const y = el('mensal-year')?.value || '2025';
+  const mk = `${y}-${m}`;
+  const label = monthLabel(mk);
+
+  const ops = DB.operations.filter(o => monthKey(o.date) === mk);
+  const salesOps = ops.filter(o => o.type==='VENDA'||o.type==='PERMUTA');
+  const buyOps = ops.filter(o => o.type==='COMPRA');
+  const newLots = DB.lots.filter(l => monthKey(l.dateBuy) === mk);
+
+  const totalVolume = ops.reduce((s,o) => s + o.totalBRL, 0);
+  const totalGain = salesOps.reduce((s,o) => s + (o.gainLoss||0), 0);
+
+  const taxesAll = calcTaxes();
+  const taxMonth = taxesAll.find(t => t.monthKey === mk);
+
+  // Previous month comparison
+  const [ym, mm] = mk.split('-').map(Number);
+  let prevM = mm - 1, prevY = ym;
+  if (prevM < 1) { prevM = 12; prevY--; }
+  const prevMk = `${prevY}-${String(prevM).padStart(2,'0')}`;
+  const prevOps = DB.operations.filter(o => monthKey(o.date) === prevMk);
+  const prevVolume = prevOps.reduce((s,o)=>s+o.totalBRL,0);
+  const prevGain = prevOps.filter(o=>o.type!=='COMPRA').reduce((s,o)=>s+(o.gainLoss||0),0);
+
+  const volChg = prevVolume > 0 ? ((totalVolume-prevVolume)/prevVolume)*100 : null;
+  const gainChg = prevGain !== 0 ? ((totalGain-prevGain)/Math.abs(prevGain))*100 : null;
+
+  let html = `
+  <div class="cards-row cards-4">
+    <div class="card"><div class="card-label">Operações</div><div class="card-value">${ops.length}</div></div>
+    <div class="card"><div class="card-label">Volume Negociado</div><div class="card-value">${fmtBRL(totalVolume)}</div></div>
+    <div class="card"><div class="card-label">Ganho Realizado</div><div class="card-value ${colorPL(totalGain)}">${fmtBRL(totalGain)}</div></div>
+    <div class="card"><div class="card-label">Imposto DARF</div><div class="card-value ${taxMonth && taxMonth.tax > 0 ? 'negative':'neutral'}">${taxMonth ? fmtBRL(taxMonth.tax) : fmtBRL(0)}</div></div>
+  </div>`;
+
+  // Compare with previous
+  if (prevOps.length > 0) {
+    html += `<div class="card" style="margin-bottom:16px">
+      <div class="card-label">📊 Comparativo com ${monthLabel(prevMk)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px">
+        <div>Volume: <span class="${volChg!==null?(volChg>=0?'positive':'negative'):'neutral'}">${volChg!==null?fmtPct(volChg):'N/A'}</span></div>
+        <div>Ganho: <span class="${gainChg!==null?(gainChg>=0?'positive':'negative'):'neutral'}">${gainChg!==null?fmtPct(gainChg):'N/A'}</span></div>
+      </div>
+    </div>`;
+  }
+
+  // Tax situation
+  if (taxMonth) {
+    html += `<div class="alert-box ${taxMonth.isExempt?'':'danger'}" style="margin-bottom:16px">
+      <h4>Situação Fiscal — ${label}</h4>
+      <p>Total vendas: <strong>${fmtBRL(taxMonth.totalSales)}</strong> — 
+      ${taxMonth.isExempt ? '✅ <strong>ISENTO</strong> (vendas ≤ R$ 35.000,00)' : `⚠️ <strong>TRIBUTÁVEL</strong> — Imposto: ${fmtBRL(taxMonth.tax)} — Vencimento: ${fmtDate(taxMonth.dueDate)}`}</p>
+    </div>`;
+  }
+
+  // Operations table
+  html += `<div class="table-card">
+    <div class="table-header"><h3>Operações de ${label}</h3></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Data</th><th>Tipo</th><th>Ativo</th><th>Qtd</th><th>Preço</th><th>Total BRL</th><th>G/P</th><th>Exchange</th></tr></thead>
+      <tbody>`;
+  for (const op of ops.sort((a,b)=>a.date.localeCompare(b.date))) {
+    const exc = getExchange(op.exchangeId);
+    html += `<tr>
+      <td>${fmtDate(op.date)}</td>
+      <td><span class="badge ${op.type==='COMPRA'?'badge-buy':op.type==='VENDA'?'badge-sell':'badge-swap'}">${op.type}</span></td>
+      <td>${op.type==='PERMUTA'?`${op.asset}→${op.assetTo}`:op.asset}</td>
+      <td class="td-mono">${fmtNum(op.qty,8)}</td>
+      <td>${fmtBRL(op.price)}</td>
+      <td>${fmtBRL(op.totalBRL)}</td>
+      <td class="${op.gainLoss!==null?colorPL(op.gainLoss):'neutral'}">${op.gainLoss!==null?fmtBRL(op.gainLoss):'—'}</td>
+      <td>${exc.nome}</td>
+    </tr>`;
+  }
+  if (!ops.length) html += `<tr><td colspan="8" class="empty-state">Nenhuma operação em ${label}</td></tr>`;
+  html += `</tbody></table></div></div>`;
+
+  // New lots
+  if (newLots.length) {
+    html += `<div class="table-card">
+      <div class="table-header"><h3>Novos Lotes Criados (${newLots.length})</h3></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Lote</th><th>Ativo</th><th>Qtd</th><th>Custo Médio</th><th>Custo Total</th><th>Exchange</th></tr></thead>
+        <tbody>`;
+    for (const l of newLots) {
+      const exc = getExchange(l.exchangeId);
+      html += `<tr>
+        <td><strong>${l.lotId}</strong></td><td>${l.asset}</td>
+        <td class="td-mono">${fmtNum(l.qtyOriginal,8)}</td>
+        <td>${fmtBRL(l.costBasis)}</td><td>${fmtBRL(l.costTotal)}</td>
+        <td>${exc.nome}</td>
+      </tr>`;
+    }
+    html += `</tbody></table></div></div>`;
+  }
+
+  el('mensal-content').innerHTML = html;
+}
+
+// ============================================================
+//  PAGE: RELATÓRIO ANUAL
+// ============================================================
+function renderAnual() {
+  const now = new Date();
+  let html = `
+  <div class="flex-between" style="margin-bottom:20px">
+    <div><div class="section-title">📆 Relatório Anual</div></div>
+    <div class="flex">
+      <select class="form-control" id="anual-year" onchange="renderAnualContent()">
+        ${[2023,2024,2025,2026].map(y=>`<option value="${y}" ${now.getFullYear()===y?'selected':''}>${y}</option>`).join('')}
+      </select>
+      <button class="btn btn-ghost no-print" onclick="window.print()">🖨️ Imprimir</button>
+    </div>
+  </div>
+  <div id="anual-content"></div>`;
+  el('content-area').innerHTML = html;
+  renderAnualContent();
+}
+
+function renderAnualContent() {
+  const year = parseInt(el('anual-year')?.value || new Date().getFullYear());
+
+  const yearOps = DB.operations.filter(o => new Date(o.date).getFullYear() === year);
+  const yearBuys = yearOps.filter(o=>o.type==='COMPRA');
+  const yearSales = yearOps.filter(o=>o.type!=='COMPRA');
+
+  const totalInvested = yearBuys.reduce((s,o)=>s+o.totalBRL+o.fees,0);
+  const totalSold = yearSales.reduce((s,o)=>s+(o.type==='PERMUTA'?o.refBRL:o.totalBRL),0);
+  const totalGain = yearSales.reduce((s,o)=>s+(o.gainLoss||0),0);
+
+  const yearTaxes = calcTaxes().filter(t => t.monthKey.startsWith(String(year)));
+  const totalTax = yearTaxes.reduce((s,t)=>s+t.tax,0);
+  const paidDarfs = DB.darfs.filter(d => d.monthKey.startsWith(String(year)) && d.status==='Pago');
+  const totalPaid = paidDarfs.reduce((s,d)=>s+d.tax,0);
+
+  let html = `
+  <div class="cards-row cards-4">
+    <div class="card"><div class="card-label">Total Investido</div><div class="card-value">${fmtBRL(totalInvested)}</div></div>
+    <div class="card"><div class="card-label">Total Alienado</div><div class="card-value">${fmtBRL(totalSold)}</div></div>
+    <div class="card"><div class="card-label">Ganho Realizado</div><div class="card-value ${colorPL(totalGain)}">${fmtBRL(totalGain)}</div></div>
+    <div class="card"><div class="card-label">Imposto Due / Pago</div><div class="card-value">${fmtBRL(totalTax)} / <span class="positive">${fmtBRL(totalPaid)}</span></div></div>
+  </div>`;
+
+  // Monthly P&L chart
+  html += `<div class="chart-card"><div class="chart-title">P&L Realizado por Mês — ${year}</div><canvas id="chart-anual-monthly" height="120"></canvas></div>`;
+
+  // P&L by asset
+  const byAsset = {};
+  for (const op of yearSales) {
+    if (!byAsset[op.asset]) byAsset[op.asset] = 0;
+    byAsset[op.asset] += op.gainLoss||0;
+  }
+
+  html += `<div class="table-card">
+    <div class="table-header"><h3>P&L por Ativo — ${year}</h3></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Ativo</th><th>Operações</th><th>Total Alienado</th><th>P&L Realizado</th></tr></thead><tbody>`;
+  for (const [asset, pl] of Object.entries(byAsset)) {
+    const opsAsset = yearSales.filter(o=>o.asset===asset);
+    const totalAl = opsAsset.reduce((s,o)=>s+(o.type==='PERMUTA'?o.refBRL:o.totalBRL),0);
+    html += `<tr>
+      <td><strong>${asset}</strong></td>
+      <td>${opsAsset.length}</td>
+      <td>${fmtBRL(totalAl)}</td>
+      <td class="${colorPL(pl)}">${fmtBRL(pl)}</td>
+    </tr>`;
+  }
+  if (!Object.keys(byAsset).length) html += `<tr><td colspan="4" class="empty-state">Sem vendas em ${year}</td></tr>`;
+  html += `</tbody></table></div></div>`;
+
+  // IRPF — Bens e Direitos
+  html += `<div class="section-divider">IRPF — Bens e Direitos (Ficha de Bens)</div>`;
+  html += `<div class="info-box">Código 89 — Criptoativos. Informe pelo custo de aquisição (não pelo valor de mercado).</div>`;
+  html += `<div class="table-card">
+    <div class="table-header"><h3>Bens e Direitos — Criptoativos</h3></div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th>Código</th><th>Ativo</th><th>Quantidade (${year-1}/12/31)</th><th>Custo (${year-1}/12/31)</th>
+        <th>Quantidade (${year}/12/31)</th><th>Custo (${year}/12/31)</th>
+      </tr></thead><tbody>`;
+
+  const assetsPrev = calcPortfolioAtDate(`${year-1}-12-31`);
+  const assetsCurr = calcPortfolioAtDate(`${year}-12-31`);
+  const allAssetsIRPF = [...new Set([...Object.keys(assetsPrev), ...Object.keys(assetsCurr)])].sort();
+
+  for (const asset of allAssetsIRPF) {
+    const prev = assetsPrev[asset]||{qty:0, totalCost:0};
+    const curr = assetsCurr[asset]||{qty:0, totalCost:0};
+    html += `<tr>
+      <td>89</td>
+      <td><strong>${asset}</strong></td>
+      <td class="td-mono">${fmtNum(prev.qty,8)}</td>
+      <td>${fmtBRL(prev.totalCost)}</td>
+      <td class="td-mono">${fmtNum(curr.qty,8)}</td>
+      <td>${fmtBRL(curr.totalCost)}</td>
+    </tr>`;
+  }
+  html += `</tbody></table></div></div>`;
+
+  // IRPF — Rendimentos tributados
+  if (yearTaxes.some(t => !t.isExempt && t.tax > 0)) {
+    html += `<div class="section-divider">IRPF — Rendimentos Tributados Exclusivamente na Fonte / Definitivo</div>`;
+    html += `<div class="table-card">
+      <div class="table-header"><h3>Apuração GCAP ${year}</h3></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Mês</th><th>Base Cálculo</th><th>Alíquota</th><th>Imposto</th><th>DARF Status</th></tr></thead><tbody>`;
+    for (const t of yearTaxes.filter(t=>!t.isExempt&&t.tax>0)) {
+      const paid = DB.darfs.find(d=>d.monthKey===t.monthKey&&d.status==='Pago');
+      html += `<tr>
+        <td>${t.label}</td>
+        <td>${fmtBRL(t.taxBase)}</td>
+        <td>${(t.aliquota*100).toFixed(1)}%</td>
+        <td>${fmtBRL(t.tax)}</td>
+        <td><span class="badge ${paid?'badge-green':'badge-red'}">${paid?'Pago':'Pendente'}</span></td>
+      </tr>`;
+    }
+    html += `</tbody></table></div></div>`;
+  }
+
+  el('anual-content').innerHTML = html;
+
+  // Monthly chart
+  const mLabels = [], mValues = [];
+  for (let m = 1; m <= 12; m++) {
+    const mk = `${year}-${String(m).padStart(2,'0')}`;
+    const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    mLabels.push(months[m-1]);
+    const opsM = DB.operations.filter(o => o.type!=='COMPRA' && monthKey(o.date)===mk);
+    mValues.push(opsM.reduce((s,o)=>s+(o.gainLoss||0),0));
+  }
+  const ctx = el('chart-anual-monthly');
+  if (ctx) {
+    chartInstances['anual-monthly'] = new Chart(ctx, {
+      type:'bar',
+      data:{ labels:mLabels, datasets:[{ data:mValues, backgroundColor:mValues.map(v=>v>=0?'rgba(34,197,94,.7)':'rgba(239,68,68,.7)'), borderColor:mValues.map(v=>v>=0?'#22c55e':'#ef4444'), borderWidth:1 }]},
+      options:{ responsive:true, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>`  ${fmtBRL(ctx.parsed.y)}`}}}, scales:{ x:{ticks:{color:'#8b949e'},grid:{color:'rgba(255,255,255,.05)'}}, y:{ticks:{color:'#8b949e',callback:v=>fmtBRL(v)},grid:{color:'rgba(255,255,255,.05)'}}}}
+    });
+  }
+}
+
+function calcPortfolioAtDate(dateStr) {
+  // Simulate portfolio positions at a given date
+  const snapshot = {};
+  // Clone lots
+  const lotsClone = DB.lots.map(l => ({...l}));
+  const consumptionsClone = DB.lotConsumptions.map(c => ({...c}));
+
+  for (const lot of lotsClone) {
+    if (lot.dateBuy > dateStr) continue;
+    if (!snapshot[lot.asset]) snapshot[lot.asset] = { qty:0, totalCost:0 };
+    // How much was consumed up to dateStr
+    const consumed = consumptionsClone
+      .filter(c => c.lotId===lot.lotId && c.saleDate <= dateStr)
+      .reduce((s,c)=>s+c.qtyConsumed,0);
+    const remaining = Math.max(0, lot.qtyOriginal - consumed);
+    snapshot[lot.asset].qty += remaining;
+    snapshot[lot.asset].totalCost += remaining * lot.costBasis;
+  }
+  return snapshot;
+}
+
+// ============================================================
+//  PAGE: PERMUTAS
+// ============================================================
+function renderPermutas() {
+  const perms = DB.operations.filter(o => o.type === 'PERMUTA').sort((a,b)=>b.date.localeCompare(a.date));
+
+  let html = `
+  <div class="info-box" style="margin-bottom:16px">
+    <strong>ℹ️ Tratamento Fiscal das Permutas:</strong><br>
+    A permuta é tratada como <strong>venda do ativo de saída</strong> e <strong>compra do ativo de entrada</strong> 
+    pelo valor de mercado na data da operação, para fins de apuração de ganho de capital (RFB / Instrução Normativa 1.888/2019 e GCAP).
+    O ganho ou perda é apurado sobre o ativo alienado.
+  </div>
+
+  <div class="table-card">
+    <div class="table-header"><h3>🔄 ${perms.length} Permuta(s)</h3></div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th>Data</th><th>De (Ativo)</th><th>Qtd Saída</th><th>Para (Ativo)</th><th>Qtd Entrada</th>
+        <th>Valor BRL Ref.</th><th>Ganho/Perda</th><th>Exchange</th><th>Obs</th>
+      </tr></thead><tbody>`;
+
+  for (const op of perms) {
+    const exc = getExchange(op.exchangeId);
+    html += `<tr>
+      <td>${fmtDate(op.date)}</td>
+      <td><strong>${op.asset}</strong></td>
+      <td class="td-mono">${fmtNum(op.qty,8)}</td>
+      <td><strong>${op.assetTo||'—'}</strong></td>
+      <td class="td-mono">${fmtNum(op.qtyTo||0,8)}</td>
+      <td>${fmtBRL(op.refBRL||op.totalBRL)}</td>
+      <td class="${colorPL(op.gainLoss)}">${fmtBRL(op.gainLoss)}</td>
+      <td>${exc.nome}</td>
+      <td style="font-size:11px;color:var(--text2)">${escapeHtml(op.obs||'')}</td>
+    </tr>`;
+  }
+  if (!perms.length) html += `<tr><td colspan="9" class="empty-state"><div class="empty-icon">🔄</div>Nenhuma permuta registrada</td></tr>`;
+  html += `</tbody></table></div></div>`;
+
+  el('content-area').innerHTML = html;
+}
+
+// ============================================================
+//  PAGE: EXCHANGES
+// ============================================================
+let editingExchangeId = null;
+
+function renderExchanges() {
+  let html = `
+  <div class="flex-between" style="margin-bottom:20px">
+    <div><div class="section-title">🏦 Exchanges</div><div class="section-sub">Gestão das corretoras cadastradas</div></div>
+    <button class="btn btn-primary" onclick="openExchangeModal()">+ Nova Exchange</button>
+  </div>
+
+  <div class="exchange-grid">`;
+
+  for (const exc of DB.exchanges) {
+    html += `<div class="exchange-card">
+      <div class="flex-between">
+        <div class="exchange-name">${escapeHtml(exc.nome)}</div>
+        <div class="flex">
+          <button class="btn-icon" onclick="editExchange('${exc.id}')">✏️</button>
+          <button class="btn-icon" onclick="confirmDeleteExchange('${exc.id}')">🗑️</button>
+        </div>
+      </div>
+      <div style="margin:8px 0">
+        <span class="badge ${exc.tipo==='Nacional'?'badge-green':'badge-yellow'}">${exc.tipo}</span>
+        ${exc.pais ? `<span style="font-size:12px;color:var(--text2);margin-left:8px">${exc.pais}</span>` : ''}
+      </div>
+      ${exc.site ? `<div class="exchange-meta"><a href="${escapeHtml(exc.site)}" target="_blank" style="color:var(--accent);font-size:12px">${escapeHtml(exc.site)}</a></div>` : ''}
+      ${exc.notas ? `<div class="exchange-meta" style="margin-top:6px">${escapeHtml(exc.notas)}</div>` : ''}
+    </div>`;
+  }
+
+  html += `</div>
+
+  <div class="table-card">
+    <div class="table-header"><h3>Lista de Exchanges</h3></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Nome</th><th>Tipo</th><th>País</th><th>Site</th><th>Operações</th><th>Ações</th></tr></thead>
+      <tbody>`;
+
+  for (const exc of DB.exchanges) {
+    const numOps = DB.operations.filter(o=>o.exchangeId===exc.id).length;
+    html += `<tr>
+      <td><strong>${escapeHtml(exc.nome)}</strong></td>
+      <td><span class="badge ${exc.tipo==='Nacional'?'badge-green':'badge-yellow'}">${exc.tipo}</span></td>
+      <td>${exc.pais||'—'}</td>
+      <td>${exc.site ? `<a href="${escapeHtml(exc.site)}" target="_blank" style="color:var(--accent)">${escapeHtml(exc.site)}</a>` : '—'}</td>
+      <td>${numOps}</td>
+      <td class="flex gap-8">
+        <button class="btn btn-ghost btn-sm" onclick="editExchange('${exc.id}')">✏️ Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDeleteExchange('${exc.id}')">🗑️ Excluir</button>
+      </td>
+    </tr>`;
+  }
+  if (!DB.exchanges.length) html += `<tr><td colspan="6" class="empty-state">Nenhuma exchange cadastrada</td></tr>`;
+  html += `</tbody></table></div></div>`;
+
+  el('content-area').innerHTML = html;
+}
+
+function openExchangeModal(id) {
+  editingExchangeId = id||null;
+  el('modal-exchange-title').textContent = id ? 'Editar Exchange' : 'Nova Exchange';
+  if (id) {
+    const exc = DB.exchanges.find(e=>e.id===id);
+    if (exc) {
+      el('exc-nome').value = exc.nome||'';
+      el('exc-tipo').value = exc.tipo||'Nacional';
+      el('exc-pais').value = exc.pais||'';
+      el('exc-site').value = exc.site||'';
+      el('exc-notas').value = exc.notas||'';
+    }
+  } else {
+    el('exc-nome').value=''; el('exc-tipo').value='Nacional';
+    el('exc-pais').value=''; el('exc-site').value=''; el('exc-notas').value='';
+  }
+  openModal('modal-exchange');
+}
+
+function editExchange(id) { openExchangeModal(id); }
+
+function saveExchange() {
+  const nome = el('exc-nome').value.trim();
+  if (!nome) { showToast('Nome obrigatório','error'); return; }
+  const exc = {
+    id: editingExchangeId || uid(),
+    nome, tipo: el('exc-tipo').value,
+    pais: el('exc-pais').value.trim(),
+    site: el('exc-site').value.trim(),
+    notas: el('exc-notas').value.trim()
+  };
+  if (editingExchangeId) {
+    const idx = DB.exchanges.findIndex(e=>e.id===editingExchangeId);
+    if (idx>=0) DB.exchanges[idx] = exc;
+  } else {
+    DB.exchanges.push(exc);
+  }
+  saveDB(); closeModal('modal-exchange');
+  showToast(editingExchangeId ? 'Exchange atualizada!' : 'Exchange adicionada!', 'success');
+  renderExchanges();
+}
+
+function confirmDeleteExchange(id) {
+  const exc = DB.exchanges.find(e=>e.id===id);
+  showConfirm(`Excluir ${exc?.nome}?`, 'Operações vinculadas a esta exchange não serão excluídas, mas perderão o vínculo.', () => {
+    DB.exchanges = DB.exchanges.filter(e=>e.id!==id);
+    saveDB(); showToast('Exchange excluída','success'); renderExchanges();
+  });
+}
+
+// ============================================================
+//  PAGE: CONFIGURAÇÕES
+// ============================================================
+function renderConfiguracoes() {
+  const portfolio = getPortfolio();
+
+  let html = `
+  <div class="section-divider">Método de Custeio</div>
+  <div class="form-section">
+    <div class="form-row form-row-3">
+      ${['FIFO','LIFO','Custo Médio'].map(m => `
+        <div class="card" style="cursor:pointer;border:2px solid ${DB.settings.costMethod===m?'var(--accent)':'var(--border)'}" onclick="setCostMethod('${m}')">
+          <div style="font-size:15px;font-weight:700">${m}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:4px">${m==='FIFO'?'Primeiro a entrar, primeiro a sair':m==='LIFO'?'Último a entrar, primeiro a sair':'Custo médio ponderado dos lotes'}</div>
+          ${DB.settings.costMethod===m ? '<div style="color:var(--accent);font-size:12px;margin-top:8px">✓ Selecionado</div>':''}</div>`).join('')}
+    </div>
+  </div>
+
+  <div class="section-divider">Dados do Usuário</div>
+  <div class="form-section">
+    <div class="form-row form-row-3">
+      <div class="form-group"><label>Nome</label><input class="form-control" id="cfg-nome" value="${escapeHtml(DB.settings.userName||'')}"></div>
+      <div class="form-group"><label>CPF</label><input class="form-control" id="cfg-cpf" value="${escapeHtml(DB.settings.cpf||'')}" placeholder="000.000.000-00"></div>
+      <div class="form-group"><label>Moeda Base</label><input class="form-control" value="BRL" readonly></div>
+    </div>
+    <div class="form-actions"><button class="btn btn-primary" onclick="saveUserConfig()">Salvar Dados</button></div>
+  </div>
+
+  <div class="section-divider">Preços Manuais</div>
+  <div class="form-section">
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Preços usados para calcular o P&L não realizado e valor da carteira.</p>
+    <div id="manual-prices-list">`;
+
+  const allPriceAssets = [...new Set([...portfolio.assets.map(a=>a.asset), ...Object.keys(DB.prices)])].sort();
+  for (const asset of allPriceAssets) {
+    html += `<div class="price-input-row">
+      <span class="asset-sym" style="width:70px;font-weight:700">${asset}</span>
+      <input type="number" class="form-control" id="cfg-price-${asset}" value="${DB.prices[asset]||0}" step="0.01" style="max-width:200px">
+    </div>`;
+  }
+  // Add new price field
+  html += `<div class="price-input-row" style="margin-top:12px">
+    <div class="autocomplete-wrap"><input class="form-control" id="cfg-new-asset" placeholder="Novo ativo" style="width:100px" autocomplete="off" oninput="showAC('cfg-new-asset','cfg-new-ac')"><div class="autocomplete-list" id="cfg-new-ac" style="display:none"></div></div>
+    <input type="number" class="form-control" id="cfg-new-price" placeholder="Preço BRL" step="0.01" style="max-width:180px;margin-left:8px">
+    <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="addManualPrice()">+ Adicionar</button>
+  </div>`;
+
+  html += `</div>
+    <div class="form-actions"><button class="btn btn-primary" onclick="saveManualPrices()">Salvar Preços</button></div>
+  </div>
+
+  <div class="section-divider">Backup e Restauração</div>
+  <div class="form-section">
+    <div class="flex" style="flex-wrap:wrap;gap:12px">
+      <button class="btn btn-ghost" onclick="exportJSON()">⬇ Exportar JSON</button>
+      <label class="btn btn-ghost" style="cursor:pointer">
+        ⬆ Importar JSON
+        <input type="file" accept=".json" style="display:none" onchange="importJSON(this)">
+      </label>
+    </div>
+  </div>
+
+  <div class="section-divider">Dados de Exemplo</div>
+  <div class="form-section">
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Recarrega os dados de exemplo (17 operações, 3 exchanges, lotes calculados).</p>
+    <button class="btn btn-ghost" onclick="confirmReloadSample()">🔄 Recarregar Dados de Exemplo</button>
+  </div>
+
+  <div class="section-divider" style="color:var(--danger)">Zona de Perigo</div>
+  <div class="form-section" style="border-color:rgba(239,68,68,.3)">
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Esta ação apaga todos os dados permanentemente.</p>
+    <button class="btn btn-danger" onclick="confirmClearData()">🗑️ Limpar Todos os Dados</button>
+  </div>`;
+
+  el('content-area').innerHTML = html;
+}
+
+function setCostMethod(m) {
+  DB.settings.costMethod = m;
+  saveDB(); showToast(`Método alterado para ${m}`, 'info');
+  renderConfiguracoes();
+}
+
+function saveUserConfig() {
+  DB.settings.userName = el('cfg-nome').value.trim();
+  DB.settings.cpf = el('cfg-cpf').value.trim();
+  saveDB(); showToast('Dados salvos!', 'success');
+}
+
+function saveManualPrices() {
+  const portfolio = getPortfolio();
+  const allAssets = [...new Set([...portfolio.assets.map(a=>a.asset), ...Object.keys(DB.prices)])].sort();
+  for (const asset of allAssets) {
+    const inp = el(`cfg-price-${asset}`);
+    if (inp) DB.prices[asset] = parseFloat(inp.value)||0;
+  }
+  saveDB(); showToast('Preços salvos!', 'success');
+}
+
+function addManualPrice() {
+  const asset = el('cfg-new-asset')?.value.toUpperCase().trim();
+  const price = parseFloat(el('cfg-new-price')?.value||0);
+  if (!asset || !price) { showToast('Informe ativo e preço','error'); return; }
+  DB.prices[asset] = price;
+  saveDB(); showToast(`Preço de ${asset} adicionado!`, 'success');
+  renderConfiguracoes();
+}
+
+function exportJSON() {
+  const data = JSON.stringify(DB, null, 2);
+  downloadFile(data, 'crypto_manager_backup.json', 'application/json');
+  showToast('Backup exportado!', 'success');
+}
+
+function importJSON(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      DB = data;
+      saveDB();
+      showToast('Dados importados com sucesso!', 'success');
+      navigate('dashboard');
+    } catch(err) {
+      showToast('Erro ao importar: JSON inválido', 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function confirmReloadSample() {
+  showConfirm('Recarregar dados de exemplo?', 'Todos os dados atuais serão substituídos pelos dados de exemplo.', () => {
+    loadSampleData();
+    showToast('Dados de exemplo carregados!', 'success');
+    navigate('dashboard');
+  });
+}
+
+function confirmClearData() {
+  showConfirm('Limpar TODOS os dados?', 'Esta ação é irreversível. Todos os dados serão permanentemente excluídos.', () => {
+    DB = { operations:[], lots:[], lotConsumptions:[], exchanges:[], prices:{}, darfs:[], settings:{ costMethod:'FIFO', userName:'', cpf:'' } };
+    saveDB();
+    showToast('Dados apagados', 'warning');
+    navigate('dashboard');
+  });
+}
+
+// ============================================================
+//  PAGE: EXPORTAR
+// ============================================================
+function renderExportar() {
+  let html = `
+  <div class="section-title" style="margin-bottom:20px">📤 Exportar Dados</div>
+
+  <div class="cards-row cards-2">
+    <div class="card">
+      <div class="card-label">1. CSV — Operações Completas</div>
+      <p style="font-size:13px;color:var(--text2);margin:8px 0 14px">Todas as operações com detalhes de lotes e G/P</p>
+      <div class="flex">
+        <button class="btn btn-ghost btn-sm" onclick="previewExport('csv-ops')">👁 Preview</button>
+        <button class="btn btn-primary btn-sm" onclick="exportExtratoCsv()">⬇ Baixar CSV</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">2. CSV — Relatório P&L</div>
+      <p style="font-size:13px;color:var(--text2);margin:8px 0 14px">Apenas operações com ganho/perda realizados</p>
+      <div class="flex">
+        <button class="btn btn-ghost btn-sm" onclick="previewExport('csv-pnl')">👁 Preview</button>
+        <button class="btn btn-primary btn-sm" onclick="exportPnlCsv()">⬇ Baixar CSV</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">3. CSV — Impostos (GCAP Format)</div>
+      <p style="font-size:13px;color:var(--text2);margin:8px 0 14px">Apuração mensal formatada para importação</p>
+      <div class="flex">
+        <button class="btn btn-ghost btn-sm" onclick="previewExport('csv-tax')">👁 Preview</button>
+        <button class="btn btn-primary btn-sm" onclick="exportTaxCsv()">⬇ Baixar CSV</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">4. JSON — Backup Completo</div>
+      <p style="font-size:13px;color:var(--text2);margin:8px 0 14px">Todos os dados para backup e restauração</p>
+      <div class="flex">
+        <button class="btn btn-primary btn-sm" onclick="exportJSON()">⬇ Baixar JSON</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">5. TXT — Resumo GCAP</div>
+      <p style="font-size:13px;color:var(--text2);margin:8px 0 14px">Texto formatado para preenchimento manual no GCAP</p>
+      <div class="flex">
+        <button class="btn btn-ghost btn-sm" onclick="previewGCAP()">👁 Preview</button>
+        <button class="btn btn-primary btn-sm" onclick="exportGCAPTxt()">⬇ Baixar TXT</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">6. TXT — ECAC/IRPF Bens e Direitos</div>
+      <p style="font-size:13px;color:var(--text2);margin:8px 0 14px">Resumo para declaração de IR — Ficha Bens e Direitos</p>
+      <div class="flex">
+        <button class="btn btn-ghost btn-sm" onclick="previewIRPF()">👁 Preview</button>
+        <button class="btn btn-primary btn-sm" onclick="exportIRPFTxt()">⬇ Baixar TXT</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="export-preview" style="display:none" class="table-card">
+    <div class="table-header">
+      <h3>Preview</h3>
+      <div class="actions"><button class="btn btn-ghost btn-sm" onclick="el('export-preview').style.display='none'">✕ Fechar</button></div>
+    </div>
+    <div class="gcap-text" id="export-preview-content" style="max-height:400px"></div>
+  </div>`;
+
+  el('content-area').innerHTML = html;
+}
+
+function previewExport(type) {
+  let content = '';
+  if (type === 'csv-ops') {
+    const rows = getExtratoRows();
+    content = rows.map(r => r.join(',')).join('\n');
+  } else if (type === 'csv-pnl') {
+    const rows = getPnlRows();
+    content = rows.map(r => r.join(',')).join('\n');
+  } else if (type === 'csv-tax') {
+    const rows = getTaxRows();
+    content = rows.map(r => r.join(',')).join('\n');
+  }
+  el('export-preview-content').textContent = content;
+  el('export-preview').style.display = 'block';
+  el('export-preview').scrollIntoView({ behavior:'smooth' });
+}
+
+function previewGCAP() {
+  const text = generateGCAPText(calcTaxes());
+  el('export-preview-content').textContent = text;
+  el('export-preview').style.display = 'block';
+  el('export-preview').scrollIntoView({ behavior:'smooth' });
+}
+
+function previewIRPF() {
+  const text = generateIRPFText();
+  el('export-preview-content').textContent = text;
+  el('export-preview').style.display = 'block';
+  el('export-preview').scrollIntoView({ behavior:'smooth' });
+}
+
+function getExtratoRows() {
+  const rows = [['Data','Tipo','Ativo','Qtd','Preco Unit BRL','Total BRL','Taxas','Exchange','Lotes','G/P Liquido','Obs']];
+  for (const op of DB.operations) {
+    const exc = getExchange(op.exchangeId);
+    rows.push([op.date, op.type, op.type==='PERMUTA'?`${op.asset}->${op.assetTo}`:op.asset, op.qty, op.price, op.totalBRL, op.fees, exc.nome, (op.lotIds||[]).join(';'), op.gainLoss??'', op.obs||'']);
+  }
+  return rows;
+}
+
+function getPnlRows() {
+  const rows = [['Data','Tipo','Ativo','Qtd','Custo Aquisicao','Valor Venda','Taxas','Ganho Bruto','Ganho Liquido']];
+  for (const op of DB.operations.filter(o=>(o.type==='VENDA'||o.type==='PERMUTA')&&o.gainLoss!==null)) {
+    const saleVal = op.type==='PERMUTA'?op.refBRL:op.totalBRL;
+    const costAq = (op.costBasis||0)*op.qty;
+    rows.push([op.date, op.type, op.asset, op.qty, costAq.toFixed(2), saleVal.toFixed(2), op.fees, (op.grossGain||0).toFixed(2), op.gainLoss.toFixed(2)]);
+  }
+  return rows;
+}
+
+function getTaxRows() {
+  const rows = [['Mes','Total Vendas','Ganhos','Perdas','Ganho Liquido','Prejuizo Compensado','Base Calculo','Aliquota','Imposto','Isento','Status DARF']];
+  for (const t of calcTaxes()) {
+    rows.push([t.label, t.totalSales.toFixed(2), t.totalGains.toFixed(2), t.totalLosses.toFixed(2), t.netGain.toFixed(2), t.lossCompensated.toFixed(2), t.taxBase.toFixed(2), (t.aliquota*100).toFixed(1)+'%', t.tax.toFixed(2), t.isExempt?'SIM':'NAO', t.darfStatus]);
+  }
+  return rows;
+}
+
+function exportPnlCsv() { downloadCSV(getPnlRows(), 'Relatorio_PnL.csv'); }
+function exportTaxCsv() { downloadCSV(getTaxRows(), 'Impostos_GCAP.csv'); }
+
+function exportGCAPTxt() {
+  const text = generateGCAPText(calcTaxes());
+  downloadText('', '', text);
+  downloadFile(text, 'GCAP_Resumo.txt', 'text/plain');
+  showToast('GCAP exportado!', 'success');
+}
+
+function generateIRPFText() {
+  const now = new Date();
+  const year = now.getFullYear() - 1;
+  let text = `IRPF — BENS E DIREITOS — CRIPTOATIVOS\n`;
+  text += `Contribuinte: ${DB.settings.userName || 'NÃO INFORMADO'}\n`;
+  text += `CPF: ${DB.settings.cpf || 'NÃO INFORMADO'}\n`;
+  text += `Ano-Calendário: ${year}\n`;
+  text += `${'='.repeat(60)}\n\n`;
+  text += `FICHA: Bens e Direitos\n`;
+  text += `Grupo 08 — Criptoativos\n`;
+  text += `Código: 89 — Demais criptoativos\n\n`;
+
+  const prevAssets = calcPortfolioAtDate(`${year-1}-12-31`);
+  const currAssets = calcPortfolioAtDate(`${year}-12-31`);
+  const allAssets = [...new Set([...Object.keys(prevAssets), ...Object.keys(currAssets)])].sort();
+
+  for (const asset of allAssets) {
+    const prev = prevAssets[asset]||{qty:0,totalCost:0};
+    const curr = currAssets[asset]||{qty:0,totalCost:0};
+    text += `ATIVO: ${asset}\n`;
+    text += `  Discriminação: Criptoativo ${asset} — Adquirido em exchanges de criptomoedas\n`;
+    text += `  Situação em 31/12/${year-1}: ${fmtNum(prev.qty,8)} ${asset} — Custo: ${fmtBRL(prev.totalCost)}\n`;
+    text += `  Situação em 31/12/${year}: ${fmtNum(curr.qty,8)} ${asset} — Custo: ${fmtBRL(curr.totalCost)}\n\n`;
+  }
+
+  return text;
+}
+
+function exportIRPFTxt() {
+  const text = generateIRPFText();
+  downloadFile(text, 'IRPF_Bens_Direitos.txt', 'text/plain');
+  showToast('IRPF exportado!', 'success');
+}
+
+function downloadText(textOrElId, filename, directText) {
+  const text = directText || (el(textOrElId) ? el(textOrElId).textContent : '');
+  downloadFile(text, filename || 'export.txt', 'text/plain');
+}
+
+function downloadGCAPModal() {
+  const text = el('modal-gcap-content')?.textContent || '';
+  downloadFile(text, 'GCAP_Resumo.txt', 'text/plain');
+}
+
+// ============================================================
+//  HELPERS: Modal, Toast, Download, Confirm
+// ============================================================
+function openModal(id) { el(id)?.classList.add('open'); }
+function closeModal(id) { el(id)?.classList.remove('open'); }
+
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if(e.target === m) closeModal(m.id); });
+});
+
+function showToast(msg, type='info') {
+  const icons = { success:'✅', error:'❌', info:'ℹ️', warning:'⚠️' };
+  const toast = ce('div', `toast ${type}`, `${icons[type]||''} ${escapeHtml(msg)}`);
+  el('toast-container').appendChild(toast);
+  setTimeout(() => toast.remove(), 3500);
+}
+
+let confirmCallback = null;
+function showConfirm(title, text, callback) {
+  el('modal-confirm-title').textContent = title;
+  el('modal-confirm-text').textContent = text;
+  confirmCallback = callback;
+  openModal('modal-confirm');
+}
+el('modal-confirm-btn').addEventListener('click', () => {
+  closeModal('modal-confirm');
+  if (confirmCallback) { confirmCallback(); confirmCallback = null; }
+});
+
+function downloadCSV(rows, filename) {
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  downloadFile(csv, filename, 'text/csv;charset=utf-8;');
+  showToast(`${filename} baixado!`, 'success');
+}
+
+function downloadFile(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+
+function copyText(elId) {
+  const text = el(elId)?.textContent || '';
+  navigator.clipboard.writeText(text).then(() => showToast('Copiado!', 'success')).catch(() => showToast('Falha ao copiar','error'));
+}
+
+// ============================================================
+//  BADGE UPDATE
+// ============================================================
+function updateBadges() {
+  const unpaid = calcTaxes().filter(t => t.tax > 0 && !DB.darfs.find(d=>d.monthKey===t.monthKey&&d.status==='Pago'));
+  const badge = document.querySelector('[data-page="impostos"] .nav-badge');
+  if (unpaid.length > 0) {
+    if (!badge) {
+      const navItem = document.querySelector('[data-page="impostos"]');
+      if (navItem) { const b = ce('span','nav-badge', String(unpaid.length)); navItem.appendChild(b); }
+    } else {
+      badge.textContent = String(unpaid.length);
+    }
+  } else if (badge) badge.remove();
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+loadDB();
+if (!DB.operations.length && !DB.exchanges.length) {
+  loadSampleData();
+} else {
+  // Ensure settings exist
+  if (!DB.settings) DB.settings = { costMethod:'FIFO', userName:'', cpf:'' };
+  if (!DB.prices) DB.prices = {};
+  if (!DB.darfs) DB.darfs = [];
+}
+
+updateBadges();
+navigate('dashboard');
+</script>
+</body>
+</html>
